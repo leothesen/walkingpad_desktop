@@ -49,6 +49,10 @@ open class WalkingPadService: NSObject, CBPeripheralDelegate, ObservableObject {
         return peripheral == self.connection?.peripheral
     }
     
+    public func connectedPeripheral() -> CBPeripheral? {
+        return self.connection?.peripheral
+    }
+    
     public func command() -> WalkingPadCommand? {
         guard let connection = self.connection else { return nil }
         return WalkingPadCommand(connection)

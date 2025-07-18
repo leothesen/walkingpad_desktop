@@ -62,13 +62,22 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         self.stepsUploader.reset()
     }
 
-    @objc func receiveWakeNotification(sender: AnyObject){
-        NSLog("Reveived wake notification, starting timer");
+    @objc func receiveWakeNotification(sender: AnyObject) {
+        NSLog("Received wake notification, reinitializing services");
+        
+        self.updateTimer?.stop()
+        self.mqttService.stop()
+        
         self.bluetoothDiscoverService.start()
-        self.updateTimer?.start()
         self.mqttService.start()
+        self.updateTimer?.start()
+        
+        DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) { [weak self] in
+            self?.bluetoothDiscoverService.reconnectToKnownPeripheral()
+        }
+
         self.stepsUploader.reset()
-    
+        self.workout.resetIfDateChanged()
     }
     
     func applicationDidFinishLaunching(_ aNotification: Notification) {

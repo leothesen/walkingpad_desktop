@@ -1,5 +1,6 @@
 import Foundation
-import CocoaMQTT
+import MQTTNIO
+import NIO
 
 struct MqttConfiguration: Codable {
     var username: String
@@ -7,11 +8,6 @@ struct MqttConfiguration: Codable {
     var host: String
     var port: UInt16
     var topic: String
-}
-
-struct MqttConnection {
-    var mqtt: CocoaMQTT
-    var config: MqttConfiguration
 }
 
 struct MqttData: Codable {
@@ -22,35 +18,60 @@ struct MqttData: Codable {
 }
 
 class MqttService {
-    private var connection: MqttConnection?
+    private var client: MQTTClient?
     private var fileSystem: FileSystem
     private var lastMessageTime: Date?
+    private let eventLoopGroup = MultiThreadedEventLoopGroup(numberOfThreads: 1)
+    private var config: MqttConfiguration?
     
     init(_ fileSystem: FileSystem) {
         self.fileSystem = fileSystem
     }
     
+    deinit {
+        try? eventLoopGroup.syncShutdownGracefully()
+    }
+    
     func start() {
         guard let config = self.loadConfig() else { return }
-
-        let clientID = "WalkingPadClient-" + String(ProcessInfo().processIdentifier)
-        let mqtt = CocoaMQTT(clientID: clientID, host: config.host, port: config.port)
-    
-        mqtt.username = config.username
-        mqtt.password = config.password
-        mqtt.keepAlive = 60
-        let result = mqtt.connect()
+        self.config = config
         
-        print("MQTT connection result: \(result)")
+        let client = MQTTClient(
+            configuration: .init(
+                target: .host(config.host, port: Int(config.port)),
+                clientId: "WalkingPadClient-\(ProcessInfo().processIdentifier)",
+                credentials: config.username.isEmpty ? nil : .init(username: config.username, password: config.password)
+            ),
+            eventLoopGroupProvider: .shared(eventLoopGroup)
+        )
         
-        if (result) {
-            self.connection = MqttConnection(mqtt: mqtt, config: config)
+        client.connect().flatMap { _ -> EventLoopFuture<Void> in
+            print("MQTT connected successfully")
+            self.client = client
+            _ = self.subscribeToTopics(config: config)
+            return self.eventLoopGroup.next().makeSucceededFuture(())
+        }.whenComplete { result in
+            switch result {
+            case .success:
+                print("MQTT connected successfully")
+                self.client = client
+                self.subscribeToTopics(config: config)
+            case .failure(let error):
+                print("MQTT connection failed: \(error)")
+            }
         }
     }
     
+    @discardableResult
+    private func subscribeToTopics(config: MqttConfiguration) -> EventLoopFuture<Void> {
+        guard let client = client else {
+            return eventLoopGroup.next().makeFailedFuture(NSError(domain: "MQTT", code: 1, userInfo: [NSLocalizedDescriptionKey: "Not connected"]))
+        }
+        return client.subscribe(to: [.init(topicFilter: config.topic, qos: .atMostOnce)]).map { _ in }
+    }
+    
     func stop() {
-        guard let connection = self.connection else { return }
-        connection.mqtt.disconnect()
+        try? client?.disconnect().wait()
     }
     
     private func loadConfig() -> MqttConfiguration? {
@@ -81,16 +102,28 @@ class MqttService {
     }
     
     public func publish(oldState: DeviceState?, newState: DeviceState, workoutState: WorkoutState) {
-        guard let connection = self.connection else { return }
+        guard let client = self.client else { return }
         if (!shouldSend(oldState: oldState, newState: newState)) {
             return
         }
         
-        let config = connection.config
         do {
-            let jsonData = try JSONEncoder().encode(MqttData(stepsWalkingpad: newState.steps, stepsTotal: workoutState.steps, distanceTotal: workoutState.distance, speedKmh: newState.speedKmh()))
-            let json = [UInt8](jsonData)
-            connection.mqtt.publish(CocoaMQTTMessage(topic: "\(config.topic)", payload: json))
+            let jsonData = try JSONEncoder().encode(MqttData(
+                stepsWalkingpad: newState.steps,
+                stepsTotal: workoutState.steps,
+                distanceTotal: workoutState.distance,
+                speedKmh: newState.speedKmh()
+            ))
+            
+            let jsonString = String(data: jsonData, encoding: .utf8) ?? ""
+            print("Publishing MQTT data: \(jsonString)")
+            
+            client.publish(
+                .string(jsonString),
+                to: self.config?.topic ?? "walkingpad/stats",
+                qos: .atMostOnce
+            )
+            
             self.lastMessageTime = Date()
         } catch {
             print("error while encoding mqtt data, \(error)")

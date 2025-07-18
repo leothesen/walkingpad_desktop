@@ -12,12 +12,22 @@ open class BluetoothDiscoveryService: NSObject, CBCentralManagerDelegate, Observ
     }
     
     public func start() {
-        self.centralManager = CBCentralManager(delegate: self, queue: nil)
+        self.centralManager = nil
         self.bluetoothPeripheral = nil
         self.walkingPadService.onDisconnect()
+        
+        self.centralManager = CBCentralManager(delegate: self, queue: nil)
         print("Central Manager State: \(self.centralManager.state)")
+        
         DispatchQueue.main.asyncAfter(deadline: .now() + 1) {
             self.centralManagerDidUpdateState(self.centralManager)
+        }
+    }
+    
+    func reconnectToKnownPeripheral() {
+        guard let peripheral = walkingPadService.connectedPeripheral() else { return }
+        if centralManager.state == .poweredOn && peripheral.state != .connected {
+            centralManager.connect(peripheral, options: nil)
         }
     }
 
