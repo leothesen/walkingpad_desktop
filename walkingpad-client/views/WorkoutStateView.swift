@@ -34,14 +34,15 @@ struct WorkoutStateView: View {
 
     var body: some View {
         let statusSeconds = walkingPadService.lastStatus()?.walkingTimeSeconds ?? 0
-        VStack(spacing: 4) {
-            Text("\(formatTime(workout.walkingSeconds)) (\(formatTime(statusSeconds)))")
-                .font(.headline)
-            Text("\(workout.steps) Steps")
-                .font(.title3.weight(.semibold))
+        VStack(spacing: 2) {
             Text("\(distanceTextFor(workout.distance))")
-                .font(.subheadline)
-                .foregroundStyle(.secondary)
+                .font(.title2.weight(.semibold))
+            HStack(spacing: 8) {
+                Text("\(workout.steps) steps")
+                Text("\(formatTime(workout.walkingSeconds))")
+            }
+            .font(.caption)
+            .foregroundStyle(.secondary)
         }
         .padding(10)
         .glassEffect(.regular, in: .rect(cornerRadius: 12))
