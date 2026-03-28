@@ -7,34 +7,30 @@ enum TimeRange: String, CaseIterable {
     case allTime = "Monthly"
 }
 
-/// Represents a single bar in the daily/monthly chart.
-struct DailyBar: Identifiable {
+/// A single data point for the trend chart and daily breakdowns.
+struct DailyPoint: Identifiable {
     let id = UUID()
     let date: Date
-    let distance: Int
+    let distance: Int      // meters
     let steps: Int
     let walkingSeconds: Int
     let sessionCount: Int
+
+    var distanceKm: Double { Double(distance) / 1000.0 }
 }
 
-/// Represents one cell in the activity heatmap (day-of-week x hour-of-day).
-struct HeatmapCell: Identifiable {
-    let id = UUID()
-    let dayOfWeek: Int   // 1=Sun ... 7=Sat (Calendar default)
-    let dayLabel: String // Mon, Tue, etc.
-    let hour: Int        // 0-23
-    let distance: Double // meters
-}
-
-/// Computes derived stats from raw workout data for the stats window.
+/// Computes derived stats from raw workout data for the stats dashboard.
 class StatsViewModel: ObservableObject {
     @Published var selectedRange: TimeRange = .week
+    @Published var hoveredPoint: DailyPoint? = nil
 
     let allWorkouts: [WorkoutSaveData]
 
     init(workouts: [WorkoutSaveData]) {
         self.allWorkouts = workouts
     }
+
+    // MARK: - Filtering
 
     var filteredWorkouts: [WorkoutSaveData] {
         let now = Date()
@@ -51,6 +47,26 @@ class StatsViewModel: ObservableObject {
         }
     }
 
+    /// Previous period for trend comparison (e.g., prior 7 days for week view).
+    private var previousPeriodWorkouts: [WorkoutSaveData] {
+        let now = Date()
+        let calendar = Calendar.current
+        switch selectedRange {
+        case .week:
+            let start = calendar.date(byAdding: .day, value: -14, to: now)!
+            let end = calendar.date(byAdding: .day, value: -7, to: now)!
+            return allWorkouts.filter { $0.date >= start && $0.date < end }
+        case .month:
+            let start = calendar.date(byAdding: .day, value: -60, to: now)!
+            let end = calendar.date(byAdding: .day, value: -30, to: now)!
+            return allWorkouts.filter { $0.date >= start && $0.date < end }
+        case .allTime:
+            return []
+        }
+    }
+
+    // MARK: - Totals
+
     var totalDistance: Int { filteredWorkouts.reduce(0) { $0 + $1.distance } }
     var totalSteps: Int { filteredWorkouts.reduce(0) { $0 + $1.steps } }
     var totalWalkingSeconds: Int { filteredWorkouts.reduce(0) { $0 + $1.walkingSeconds } }
@@ -61,16 +77,42 @@ class StatsViewModel: ObservableObject {
         }
     }
 
-    /// Formatted distance string (e.g., "12.3 km" or "850 m").
-    var distanceText: String {
-        let meters = totalDistance
-        if meters >= 1000 {
-            return String(format: "%.1f km", Double(meters) / 1000.0)
-        }
-        return "\(meters) m"
+    var averageSpeedKmh: Double {
+        let totalSeconds = Double(totalWalkingSeconds)
+        let totalKm = Double(totalDistance) / 1000.0
+        guard totalSeconds > 0 else { return 0 }
+        return totalKm / (totalSeconds / 3600.0)
     }
 
-    /// Formatted walking time string.
+    // MARK: - Trend (vs previous period)
+
+    /// Percentage change in distance vs previous period. Nil for allTime.
+    var distanceTrend: Double? {
+        guard selectedRange != .allTime else { return nil }
+        let previous = previousPeriodWorkouts.reduce(0) { $0 + $1.distance }
+        guard previous > 0 else {
+            return totalDistance > 0 ? 100.0 : 0
+        }
+        return (Double(totalDistance - previous) / Double(previous)) * 100.0
+    }
+
+    // MARK: - Formatted Strings
+
+    var distanceText: String {
+        let km = Double(totalDistance) / 1000.0
+        if km >= 10 {
+            return String(format: "%.0f", km)
+        } else if km >= 1 {
+            return String(format: "%.1f", km)
+        } else {
+            return "\(totalDistance)"
+        }
+    }
+
+    var distanceUnit: String {
+        totalDistance >= 1000 ? "km" : "m"
+    }
+
     var timeText: String {
         let hours = totalWalkingSeconds / 3600
         let minutes = (totalWalkingSeconds % 3600) / 60
@@ -80,14 +122,18 @@ class StatsViewModel: ObservableObject {
         return "\(minutes)m"
     }
 
-    // MARK: - Daily Bar Data
+    var avgSpeedText: String {
+        String(format: "%.1f", averageSpeedKmh)
+    }
 
-    var dailyBars: [DailyBar] {
+    // MARK: - Chart Data
+
+    var dailyPoints: [DailyPoint] {
         if selectedRange == .allTime {
-            return monthlyBars
+            return monthlyPoints
         }
         return filteredWorkouts.map { w in
-            DailyBar(
+            DailyPoint(
                 date: w.date,
                 distance: w.distance,
                 steps: w.steps,
@@ -97,8 +143,7 @@ class StatsViewModel: ObservableObject {
         }.sorted { $0.date < $1.date }
     }
 
-    /// Aggregated by month for the "Monthly" view.
-    private var monthlyBars: [DailyBar] {
+    private var monthlyPoints: [DailyPoint] {
         let calendar = Calendar.current
         var grouped: [DateComponents: (distance: Int, steps: Int, seconds: Int, sessions: Int)] = [:]
 
@@ -112,9 +157,9 @@ class StatsViewModel: ObservableObject {
             grouped[components] = existing
         }
 
-        return grouped.compactMap { (components, data) -> DailyBar? in
+        return grouped.compactMap { (components, data) -> DailyPoint? in
             guard let date = calendar.date(from: components) else { return nil }
-            return DailyBar(
+            return DailyPoint(
                 date: date,
                 distance: data.distance,
                 steps: data.steps,
@@ -124,49 +169,21 @@ class StatsViewModel: ObservableObject {
         }.sorted { $0.date < $1.date }
     }
 
-    // MARK: - Heatmap Data
+    // MARK: - Streak / Consistency
 
-    var heatmapData: [HeatmapCell] {
-        let calendar = Calendar.current
-        let dayLabels = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"]
-
-        // Accumulate distance per (dayOfWeek, hour) slot
-        var grid: [Int: [Int: Double]] = [:]  // [dayOfWeek: [hour: distance]]
-        for day in 1...7 {
-            grid[day] = [:]
-        }
-
-        for w in filteredWorkouts {
-            if let sessions = w.sessions {
-                for session in sessions {
-                    let dow = calendar.component(.weekday, from: session.startTime)
-                    let hour = calendar.component(.hour, from: session.startTime)
-                    grid[dow, default: [:]][hour, default: 0] += Double(session.distance)
-                }
-            } else if w.steps > 0 {
-                // Fallback: place at the date's hour
-                let dow = calendar.component(.weekday, from: w.date)
-                let hour = calendar.component(.hour, from: w.date)
-                grid[dow, default: [:]][hour, default: 0] += Double(w.distance)
-            }
-        }
-
-        var cells: [HeatmapCell] = []
-        for day in 1...7 {
-            for hour in stride(from: 6, to: 23, by: 2) {
-                let dist = (grid[day]?[hour] ?? 0) + (grid[day]?[hour + 1] ?? 0)
-                cells.append(HeatmapCell(
-                    dayOfWeek: day,
-                    dayLabel: dayLabels[day - 1],
-                    hour: hour,
-                    distance: dist
-                ))
-            }
-        }
-        return cells
+    /// Number of days walked in the current period.
+    var activeDays: Int {
+        filteredWorkouts.filter { $0.steps > 0 }.count
     }
 
-    var maxHeatmapDistance: Double {
-        heatmapData.map(\.distance).max() ?? 1
+    /// Total days in the selected period.
+    var periodDays: Int {
+        switch selectedRange {
+        case .week: return 7
+        case .month: return 30
+        case .allTime:
+            guard let first = allWorkouts.first?.date else { return 0 }
+            return max(1, Calendar.current.dateComponents([.day], from: first, to: Date()).day ?? 0)
+        }
     }
 }

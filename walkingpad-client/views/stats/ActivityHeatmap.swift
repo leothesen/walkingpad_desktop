@@ -1,53 +1,61 @@
 import SwiftUI
-import Charts
 
-/// Heatmap showing walking activity by day-of-week (x) and time-of-day (y).
-/// Color intensity represents distance covered in each 2-hour block.
-struct ActivityHeatmap: View {
-    let cells: [HeatmapCell]
-    let maxDistance: Double
+/// A compact consistency indicator showing which days in the period had activity.
+/// Replaces the full heatmap with a simpler, more glanceable view.
+struct ConsistencyStreak: View {
+    let activeDays: Int
+    let totalDays: Int
+    let workouts: [WorkoutSaveData]
 
-    private let hourLabels: [Int: String] = [
-        6: "6am", 8: "8am", 10: "10am", 12: "12pm",
-        14: "2pm", 16: "4pm", 18: "6pm", 20: "8pm", 22: "10pm"
-    ]
+    private var recentDays: [(date: Date, active: Bool)] {
+        let calendar = Calendar.current
+        let count = min(totalDays, 14) // Show up to 14 day dots
+        let today = calendar.startOfDay(for: Date())
 
-    private let dayOrder = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
+        return (0..<count).reversed().map { offset in
+            let date = calendar.date(byAdding: .day, value: -offset, to: today)!
+            let isActive = workouts.contains { w in
+                calendar.isDate(w.date, inSameDayAs: date) && w.steps > 0
+            }
+            return (date: date, active: isActive)
+        }
+    }
 
     var body: some View {
-        Chart(cells) { cell in
-            RectangleMark(
-                x: .value("Day", reorderDay(cell.dayLabel)),
-                y: .value("Hour", hourLabels[cell.hour] ?? "\(cell.hour)"),
-                width: .ratio(0.9),
-                height: .ratio(0.9)
-            )
-            .foregroundStyle(cellColor(cell.distance))
-            .cornerRadius(3)
-        }
-        .chartXAxis {
-            AxisMarks(values: dayOrder) { value in
-                AxisValueLabel()
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(alignment: .firstTextBaseline) {
+                Text("\(activeDays)")
+                    .font(.title3.weight(.semibold).monospacedDigit())
+                Text("of \(totalDays) days active")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
             }
-        }
-        .chartYAxis {
-            AxisMarks(values: Array(hourLabels.values.sorted())) { value in
-                AxisValueLabel()
+
+            HStack(spacing: 3) {
+                ForEach(Array(recentDays.enumerated()), id: \.offset) { _, day in
+                    RoundedRectangle(cornerRadius: 3)
+                        .fill(day.active ? Color.blue.opacity(0.8) : Color.primary.opacity(0.06))
+                        .frame(maxWidth: .infinity)
+                        .frame(height: 18)
+                }
+            }
+
+            HStack {
+                Text(dayLabel(recentDays.first?.date))
+                    .font(.caption2)
+                    .foregroundStyle(.tertiary)
+                Spacer()
+                Text("Today")
+                    .font(.caption2)
+                    .foregroundStyle(.tertiary)
             }
         }
     }
 
-    /// Reorder Sunday-first weekday to Monday-first for display.
-    private func reorderDay(_ label: String) -> String {
-        label
-    }
-
-    private func cellColor(_ distance: Double) -> Color {
-        guard maxDistance > 0 else { return .blue.opacity(0.05) }
-        let intensity = min(distance / maxDistance, 1.0)
-        if intensity == 0 {
-            return .blue.opacity(0.05)
-        }
-        return .blue.opacity(0.15 + intensity * 0.85)
+    private func dayLabel(_ date: Date?) -> String {
+        guard let date else { return "" }
+        let formatter = DateFormatter()
+        formatter.dateFormat = "MMM d"
+        return formatter.string(from: date)
     }
 }
