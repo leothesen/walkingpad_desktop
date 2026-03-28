@@ -7,8 +7,9 @@ struct RunningView: View {
     @EnvironmentObject
     var walkingPadService: WalkingPadService
 
-    /// Local slider state — snaps to 0.5 km/h increments and sends BLE commands on change.
+    /// Local slider state — snaps to 0.5 km/h increments, only sends BLE command on release.
     @State private var sliderSpeed: Double = 0
+    @State private var isDragging: Bool = false
 
     var body: some View {
         let state = self.walkingPadService.lastStatus()
@@ -17,17 +18,21 @@ struct RunningView: View {
         VStack(spacing: 10) {
             WorkoutStateView()
 
-            // Speed slider with label
+            // Speed slider with label — only sends BLE command when the user releases
             VStack(spacing: 4) {
                 Text(String(format: "%.1f km/h", sliderSpeed))
                     .font(.title3.weight(.semibold))
                     .monospacedDigit()
 
-                Slider(value: $sliderSpeed, in: 0.5...8.0, step: 0.5)
-                    .onChange(of: sliderSpeed) { _, newValue in
-                        let rawSpeed = UInt8(newValue * 10)
+                Slider(value: $sliderSpeed, in: 0.5...8.0, step: 0.5) {
+                    EmptyView()
+                } onEditingChanged: { editing in
+                    isDragging = editing
+                    if !editing {
+                        let rawSpeed = UInt8(sliderSpeed * 10)
                         walkingPadService.command()?.setSpeed(speed: rawSpeed)
                     }
+                }
 
                 HStack {
                     Text("0.5")
@@ -65,7 +70,8 @@ struct RunningView: View {
             sliderSpeed = max(currentSpeed, 0.5)
         }
         .onChange(of: state?.speed) { _, newSpeed in
-            // Sync slider when the treadmill reports a speed change (e.g. from auto mode)
+            // Sync slider when the treadmill reports a speed change, but not while the user is dragging
+            guard !isDragging else { return }
             let reported = Double(newSpeed ?? 0) / 10.0
             if reported > 0 && abs(reported - sliderSpeed) > 0.05 {
                 sliderSpeed = reported
