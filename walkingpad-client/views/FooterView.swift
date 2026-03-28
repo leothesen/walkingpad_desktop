@@ -1,18 +1,18 @@
 import SwiftUI
 
-/// Bottom bar with Stats link, Login/Logout button, and Quit button.
+/// Bottom bar with Stats, Login/Logout, and Quit buttons.
 /// Warning: Quit uses exit(0) which bypasses cleanup — see KNOWN_ISSUES.md #8.
 struct FooterView: View {
     @EnvironmentObject var walkingPadService: WalkingPadService
     @EnvironmentObject var workout: Workout
-    @Environment(\.openURL) var openURL
+
+    /// Singleton reference to prevent duplicate stats windows.
+    private static var statsWindow: NSWindow?
 
     var body: some View {
         HStack(spacing: 8) {
             Spacer()
-            Button(action: {
-                openURL(URL(string: "https://walkingpad-stats.netlify.app")!)
-            }) {
+            Button(action: { openStatsWindow() }) {
                 Text("Stats")
                     .font(.caption.weight(.medium))
             }
@@ -36,6 +36,33 @@ struct FooterView: View {
             .padding(.vertical, 4)
             .glassEffect(.regular.interactive(), in: .capsule)
         }
+    }
+
+    private func openStatsWindow() {
+        // Bring existing window to front if already open
+        if let existing = FooterView.statsWindow, existing.isVisible {
+            existing.makeKeyAndOrderFront(nil)
+            return
+        }
+
+        let viewModel = StatsViewModel(workouts: workout.loadAll())
+        let statsView = StatsWindowView(viewModel: viewModel)
+        let hostingView = NSHostingView(rootView: statsView)
+
+        let window = NSWindow(
+            contentRect: NSRect(x: 0, y: 0, width: 500, height: 480),
+            styleMask: [.titled, .closable, .resizable, .miniaturizable],
+            backing: .buffered,
+            defer: false
+        )
+        window.center()
+        window.title = "WalkingPad Stats"
+        window.contentView = hostingView
+        window.isReleasedWhenClosed = false
+        window.minSize = NSSize(width: 400, height: 400)
+        window.makeKeyAndOrderFront(nil)
+
+        FooterView.statsWindow = window
     }
 }
 

@@ -31,9 +31,18 @@ class Workout: ObservableObject {
     
     @Published
     public var walkingSeconds: Int = 0
-    
+
+    /// Sessions completed today (persisted to workouts.json).
+    @Published
+    public var todaySessions: [SessionSaveData] = []
+
     public var lastUpdateTime: Date = Date()
-    
+
+    // Session tracking state
+    private var currentSessionStart: Date? = nil
+    private var currentSessionSteps: Int = 0
+    private var currentSessionDistance: Int = 0
+
     public var onChangeCallback: OnChangeCallback =  {_ in }
     
     init() {
@@ -48,6 +57,10 @@ class Workout: ObservableObject {
             self.distance = 0
             self.steps = 0
             self.walkingSeconds = 0
+            self.todaySessions = []
+            self.currentSessionStart = nil
+            self.currentSessionSteps = 0
+            self.currentSessionDistance = 0
         }
     }
     
@@ -85,6 +98,38 @@ class Workout: ObservableObject {
         self.distance = self.distance + distanceDiff
         self.walkingSeconds = self.walkingSeconds + walkingTimeDiff
         self.lastUpdateTime = newState.time
+
+        // Session tracking: detect start/stop transitions
+        let wasWalking = (oldState?.speed ?? 0) > 0
+        let isWalking = newState.speed > 0
+
+        if isWalking && !wasWalking {
+            // Session started
+            self.currentSessionStart = newState.time
+            self.currentSessionSteps = 0
+            self.currentSessionDistance = 0
+        }
+
+        if self.currentSessionStart != nil {
+            // Accumulate mid-session
+            self.currentSessionSteps += stepDiff
+            self.currentSessionDistance += distanceDiff
+        }
+
+        if wasWalking && !isWalking, let sessionStart = self.currentSessionStart {
+            // Session ended — finalize and persist
+            let session = SessionSaveData(
+                startTime: sessionStart,
+                endTime: newState.time,
+                steps: self.currentSessionSteps,
+                distance: self.currentSessionDistance
+            )
+            self.todaySessions.append(session)
+            self.currentSessionStart = nil
+            self.currentSessionSteps = 0
+            self.currentSessionDistance = 0
+            save()
+        }
         
     }
     
@@ -92,7 +137,13 @@ class Workout: ObservableObject {
     /// Persists the current day's workout data to workouts.json.
     /// Replaces today's entry in the history and writes the full array.
     public func save() {
-        let workoutData = WorkoutSaveData(steps: self.steps, distance: self.distance, walkingSeconds: self.walkingSeconds, date: self.lastUpdateTime)
+        let workoutData = WorkoutSaveData(
+            steps: self.steps,
+            distance: self.distance,
+            walkingSeconds: self.walkingSeconds,
+            date: self.lastUpdateTime,
+            sessions: self.todaySessions.isEmpty ? nil : self.todaySessions
+        )
         let withoutToday = loadAll().filter { !Calendar.current.isDateInToday($0.date)}
         let newData = withoutToday + [workoutData];
         
@@ -118,6 +169,7 @@ class Workout: ObservableObject {
             self.distance = foundWorkout.distance
             self.walkingSeconds = foundWorkout.walkingSeconds
             self.lastUpdateTime = foundWorkout.date
+            self.todaySessions = foundWorkout.sessions ?? []
         }
     }
     

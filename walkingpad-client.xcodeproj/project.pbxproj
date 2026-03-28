@@ -38,6 +38,10 @@
 		A100000800000000000000AA /* MqttService.swift in Sources */ = {isa = PBXBuildFile; fileRef = A100000700000000000000AA /* MqttService.swift */; };
 		A100000B00000000000000AA /* Embassy in Frameworks */ = {isa = PBXBuildFile; productRef = A100000A00000000000000AA /* Embassy */; };
 		A100000E00000000000000AA /* MQTTNIO in Frameworks */ = {isa = PBXBuildFile; productRef = A100000D00000000000000AA /* MQTTNIO */; };
+		B200000200000000000000BB /* StatsViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = B200000100000000000000BB /* StatsViewModel.swift */; };
+		B200000400000000000000BB /* StatsWindowView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B200000300000000000000BB /* StatsWindowView.swift */; };
+		B200000600000000000000BB /* DailyDistanceChart.swift in Sources */ = {isa = PBXBuildFile; fileRef = B200000500000000000000BB /* DailyDistanceChart.swift */; };
+		B200000800000000000000BB /* ActivityHeatmap.swift in Sources */ = {isa = PBXBuildFile; fileRef = B200000700000000000000BB /* ActivityHeatmap.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -73,6 +77,10 @@
 		A100000300000000000000AA /* HCGatewayService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HCGatewayService.swift; sourceTree = "<group>"; };
 		A100000500000000000000AA /* LoginWindowView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LoginWindowView.swift; sourceTree = "<group>"; };
 		A100000700000000000000AA /* MqttService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MqttService.swift; sourceTree = "<group>"; };
+		B200000100000000000000BB /* StatsViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StatsViewModel.swift; sourceTree = "<group>"; };
+		B200000300000000000000BB /* StatsWindowView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StatsWindowView.swift; sourceTree = "<group>"; };
+		B200000500000000000000BB /* DailyDistanceChart.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DailyDistanceChart.swift; sourceTree = "<group>"; };
+		B200000700000000000000BB /* ActivityHeatmap.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ActivityHeatmap.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -111,6 +119,7 @@
 				5BA17254263EEF4C0010E483 /* services */,
 				5B2C72F826346C3100CE4F88 /* views */,
 				5B2C72F026346A8200CE4F88 /* models */,
+				B200000900000000000000BB /* viewmodels */,
 				5B2C72D8263468B800CE4F88 /* walkingpad_clientApp.swift */,
 				5B2C72DC263468B900CE4F88 /* Assets.xcassets */,
 				5B2C72E1263468B900CE4F88 /* Info.plist */,
@@ -141,6 +150,7 @@
 		5B2C72F826346C3100CE4F88 /* views */ = {
 			isa = PBXGroup;
 			children = (
+				B200000A00000000000000BB /* stats */,
 				5B2C72EC263469DD00CE4F88 /* DeviceView.swift */,
 				5B2C72DA263468B800CE4F88 /* ContentView.swift */,
 				5BA17244263EA5810010E483 /* EmptyView.swift */,
@@ -188,6 +198,24 @@
 				5BA17258263EF74F0010E483 /* DateExtension.swift */,
 			);
 			path = utils;
+			sourceTree = "<group>";
+		};
+		B200000900000000000000BB /* viewmodels */ = {
+			isa = PBXGroup;
+			children = (
+				B200000100000000000000BB /* StatsViewModel.swift */,
+			);
+			path = viewmodels;
+			sourceTree = "<group>";
+		};
+		B200000A00000000000000BB /* stats */ = {
+			isa = PBXGroup;
+			children = (
+				B200000300000000000000BB /* StatsWindowView.swift */,
+				B200000500000000000000BB /* DailyDistanceChart.swift */,
+				B200000700000000000000BB /* ActivityHeatmap.swift */,
+			);
+			path = stats;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -295,6 +323,10 @@
 				5BA1724F263ECF720010E483 /* RunningView.swift in Sources */,
 				5B43D84E267F761700A16916 /* RepeatingTimer.swift in Sources */,
 				5B15903D2641BEEC0039C334 /* HttpApi.swift in Sources */,
+			B200000200000000000000BB /* StatsViewModel.swift in Sources */,
+			B200000400000000000000BB /* StatsWindowView.swift in Sources */,
+			B200000600000000000000BB /* DailyDistanceChart.swift in Sources */,
+			B200000800000000000000BB /* ActivityHeatmap.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
