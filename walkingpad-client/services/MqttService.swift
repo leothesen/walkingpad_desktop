@@ -2,6 +2,7 @@ import Foundation
 import MQTTNIO
 import NIO
 
+/// MQTT broker connection settings, loaded from `.walkingpad-client-mqtt.json`.
 struct MqttConfiguration: Codable {
     var username: String
     var password: String
@@ -10,20 +11,30 @@ struct MqttConfiguration: Codable {
     var topic: String
 }
 
+/// JSON payload published to the MQTT topic on each state update.
 struct MqttData: Codable {
+    /// Steps reported by the treadmill in the current session
     var stepsWalkingpad: Int
+    /// Accumulated steps for the day (including previous sessions)
     var stepsTotal: Int
+    /// Accumulated distance for the day (meters)
     var distanceTotal: Int
+    /// Current treadmill speed in km/h
     var speedKmh: Double
 }
 
+/// Publishes treadmill state to an MQTT broker for Home Assistant and other home automation tools.
+///
+/// Configuration is loaded from a JSON file at app data path. If no config file exists,
+/// the service silently does nothing. Messages are rate-limited: published only on speed
+/// changes or when 30+ seconds have elapsed since the last message.
 class MqttService {
     private var client: MQTTClient?
     private var fileSystem: FileSystem
     private var lastMessageTime: Date?
     private let eventLoopGroup = MultiThreadedEventLoopGroup(numberOfThreads: 1)
     private var config: MqttConfiguration?
-    
+
     init(_ fileSystem: FileSystem) {
         self.fileSystem = fileSystem
     }

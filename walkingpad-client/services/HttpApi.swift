@@ -1,6 +1,7 @@
 import Foundation
 import Embassy
 
+/// JSON response type for the GET /treadmill/workouts endpoint.
 struct WorkoutApiData: Codable {
     var steps: Int
     var distance: Int
@@ -8,6 +9,7 @@ struct WorkoutApiData: Codable {
     var date: String
 }
 
+/// JSON response type for the GET /treadmill endpoint (current state).
 struct TreadmillState : Codable {
     var steps: Int
     var distance: Int
@@ -15,6 +17,19 @@ struct TreadmillState : Codable {
     var speed: Double
 }
 
+/// Starts an Embassy HTTP server on port 4934 for Alfred workflow and external tool integration.
+///
+/// Endpoints:
+/// - GET  /treadmill              — Current treadmill state (speed, steps, distance, time)
+/// - GET  /treadmill/workouts     — Historical workout data (up to 500 entries)
+/// - POST /treadmill/start        — Start the treadmill
+/// - POST /treadmill/stop         — Stop (set speed to 0)
+/// - POST /treadmill/faster       — Increase speed by 0.5 km/h
+/// - POST /treadmill/slower       — Decrease speed by 0.5 km/h
+/// - POST /treadmill/speed/{N}    — Set specific speed (multiples of 10: 10-80)
+///
+/// **Warning**: No authentication. Any local process can control the treadmill.
+/// This function blocks the calling thread with `loop.runForever()`.
 func startHttpServer(walkingPadService: WalkingPadService, workout: Workout) {
     let loop = try! SelectorEventLoop(selector: try! KqueueSelector())
     let dateFormatter = DateFormatter()

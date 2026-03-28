@@ -1,7 +1,9 @@
 import SwiftUI
 import CoreBluetooth
 
-
+/// Displayed when the treadmill is running (speed > 0).
+/// Shows workout stats, a 4x4 speed button grid (manual mode), walking mode toggle, and stop button.
+/// Speed buttons range from 1.0 to 8.5 km/h in 0.5 km/h increments.
 struct RunningView: View {
     @EnvironmentObject
     var walkingPadService: WalkingPadService

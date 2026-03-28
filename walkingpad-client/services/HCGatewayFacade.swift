@@ -1,5 +1,14 @@
 import Foundation
 
+/// REST API client for the HCGateway health data bridge service.
+///
+/// Base URL: https://api.hcgateway.shuchir.dev
+///
+/// Endpoints used:
+/// - POST /api/v2/login    — authenticate with username/password
+/// - POST /api/v2/refresh  — refresh an expired access token
+/// - POST /api/v2/fetch/steps — retrieve step records (unused in current flow)
+/// - PUT  /api/v2/push/steps  — upload step records with ISO8601 timestamps
 class HCGatewayAPI {
     let baseURL = URL(string: "https://api.hcgateway.shuchir.dev")!
     let session = URLSession(configuration: .default)

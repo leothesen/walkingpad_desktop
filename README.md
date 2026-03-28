@@ -1,34 +1,85 @@
-#  WalkingPad MacOS Client
+# WalkingPad macOS Client
 
-A native MacOS Client (as status bar app) to watch your steps.
+A native macOS status-bar app for controlling and monitoring [WalkingPad](https://www.walkingpad.com/) treadmills over Bluetooth.
 
+## Features
 
-### Features
+- **Bluetooth connection** — automatically discovers and connects to your WalkingPad treadmill
+- **Step tracking** — accumulates steps, distance, and walking time across sessions
+- **Speed control** — change speed directly from the menu bar (manual and automatic modes)
+- **Health sync** — upload steps to Google Fit via the [HCGateway](https://github.com/ShuchirJ/HCGateway) bridge app
+- **Statistics** — remembers past workouts and provides historical stats via an [external dashboard](https://walkingpad-stats.netlify.app)
+- **[Alfred](https://www.alfredapp.com/) workflow** — control your treadmill by keystroke ([download workflow](https://github.com/klassm/walkingpad_alfred/releases))
+- **MQTT publishing** — publish treadmill state for Home Assistant and other home automation tools
+- **Local HTTP API** — REST endpoints for programmatic control and integration
 
-* Connect to your treadmill via Bluetooth
-* Watch your steps, the app will accumulate the steps
-* You can change the speed directly in the app
-* GoogleFit support - connect the app to your Google Fit account. Whenever you pause or stop the treadmill, the steps will be uploaded to Google Fit.
-* Statistics - the app will remember the times you walked before and give you some statistics on how much you have walked in the past
-* [Alfred](https://www.alfredapp.com/) Workflow to control your treadmill by keystroke. You can download the workflow [here](https://github.com/klassm/walkingpad_alfred/releases)
-* Publish the WalkingPad state as MQTT message (>= 0.0.3)
-
-### Installation
+## Installation
 
 Download the latest release from the [releases section](https://github.com/klassm/walkingpad_macos_client/releases).
 
-Please make sure to grant the app Bluetooth permissions, to ensure the app can communicate with the WalkingPad device.
+Grant the app Bluetooth permissions when prompted:
 
 ![Bluetooth Permission](docs/bluetooth_connection.png)
 
-#### MQTT Configuration
+## Building from Source
 
-You can publish the current WalkingPad state as MQTT message. An example use case is to use the current state
-for automations in your favorite home automation tool like Home Assistant.
+1. Open `walkingpad-client.xcodeproj` in Xcode 16.3+
+2. Dependencies are managed via Swift Package Manager and will resolve automatically
+3. Build with Cmd+B, run with Cmd+R
+4. The app appears in the menu bar (not the Dock)
 
-To configure the app to use MQTT, you need to provide a config file containing the connection data. Please
-place this file in `~/Library/Containers/klassm.walkingpad-client/Data/Library/Autosave Information/.walkingpad-client-mqtt.json`
-(this is quite a complex path, however it does not require any additional permissions to read it).
+**Note:** `project.pbxproj` is gitignored. On a fresh clone you may need to recreate Xcode project settings and re-add source files to the target.
+
+### Dependencies
+
+| Package | Version | Purpose |
+|---------|---------|---------|
+| [Embassy](https://github.com/envoy/Embassy) | 4.1.6 | Embedded HTTP server for the local API |
+| [mqtt-nio](https://github.com/sroebert/mqtt-nio) | 2.8.1 | MQTT client for Home Assistant integration |
+| [swift-nio](https://github.com/apple/swift-nio) | 2.84.0 | Network I/O (mqtt-nio dependency) |
+
+## Screenshots
+
+![Tray App](docs/tray_app.png)
+![Stats](docs/stats.png)
+
+## HTTP API
+
+The app runs a local HTTP server on **port 4934** for Alfred workflow integration and external tools.
+
+### Endpoints
+
+| Method | Path | Description |
+|--------|------|-------------|
+| GET | `/treadmill` | Current state: steps, distance, walkingSeconds, speed (km/h) |
+| GET | `/treadmill/workouts` | Historical workout data (up to 500 entries) |
+| POST | `/treadmill/start` | Start the treadmill |
+| POST | `/treadmill/stop` | Stop the treadmill (set speed to 0) |
+| POST | `/treadmill/faster` | Increase speed by 0.5 km/h |
+| POST | `/treadmill/slower` | Decrease speed by 0.5 km/h |
+| POST | `/treadmill/speed/{10-80}` | Set specific speed (multiples of 10, e.g., `/speed/30` = 3.0 km/h) |
+
+### Example
+
+```bash
+# Get current treadmill state
+curl http://localhost:4934/treadmill
+
+# Start walking at 3.0 km/h
+curl -X POST http://localhost:4934/treadmill/start
+curl -X POST http://localhost:4934/treadmill/speed/30
+```
+
+Returns 428 if treadmill is not connected.
+
+## MQTT Configuration
+
+Publish the current treadmill state as MQTT messages for home automation (Home Assistant, etc.).
+
+Create a config file at:
+```
+~/Library/Containers/klassm.walkingpad-client/Data/Library/Autosave Information/.walkingpad-client-mqtt.json
+```
 
 ```json
 {
@@ -40,19 +91,18 @@ place this file in `~/Library/Containers/klassm.walkingpad-client/Data/Library/A
 }
 ```
 
-The app will automatically read the config data and start to publish messages.
+The app reads this on startup and publishes messages on speed changes (or every 30 seconds):
 
-An example message looks like the following:
-```
+```json
 {
-    "speedKmh":1.5,
-    "stepsTotal":19202,
-    "distanceTotal":4690,
-    "stepsWalkingpad":510
+  "speedKmh": 1.5,
+  "stepsTotal": 19202,
+  "distanceTotal": 4690,
+  "stepsWalkingpad": 510
 }
 ```
 
-Home Assistant can afterwards be configured to read the data.
+### Home Assistant Example
 
 ```yaml
 mqtt:
@@ -69,12 +119,48 @@ mqtt:
       unit_of_measurement: "Steps"
 ```
 
-### Screenshots
+## Health Sync (HCGateway)
 
-![Tray App](docs/tray_app.png)
-![Stats](docs/stats.png)
+To sync steps to Google Fit:
 
+1. Install the [HCGateway](https://github.com/ShuchirJ/HCGateway) bridge app on your phone
+2. Create an account and connect Google Fit
+3. Click "Login" in the WalkingPad app footer
+4. Enter the same credentials you used for HCGateway
 
-### Credits
+Steps are automatically uploaded when you stop or pause the treadmill (minimum 10 steps).
 
-The implementation is heavily inspired by [ph4r05/ph4-walkingpad](https://github.com/ph4r05/ph4-walkingpad).
+## Project Structure
+
+```
+walkingpad-client/
+├── walkingpad_clientApp.swift     # App entry point + AppDelegate
+├── models/                        # Data types (DeviceState, Change, WorkoutSaveData)
+├── services/
+│   ├── walkingPad/
+│   │   ├── WalkingPadService.swift    # BLE state + notification parsing
+│   │   └── WalkingPadCommand.swift    # BLE write commands
+│   ├── BluetoothDiscoveryService.swift
+│   ├── BluetoothPeripheral.swift
+│   ├── Workout.swift              # Step accumulation + persistence
+│   ├── HttpApi.swift              # Local HTTP server (port 4934)
+│   ├── MqttService.swift          # MQTT publishing
+│   ├── HCGatewayService.swift     # Health sync auth + orchestration
+│   ├── HCGatewayFacade.swift      # HCGateway REST client
+│   ├── StepsUploader.swift        # Batched step upload trigger
+│   ├── FileSystem.swift           # JSON file persistence
+│   └── RepeatingTimer.swift       # Polling timer
+├── views/                         # SwiftUI views
+└── utils/                         # Date extension helper
+```
+
+For detailed technical documentation, see [ARCHITECTURE.md](ARCHITECTURE.md).
+For known bugs and improvement areas, see [KNOWN_ISSUES.md](KNOWN_ISSUES.md).
+
+## Credits
+
+The BLE protocol implementation is inspired by [ph4r05/ph4-walkingpad](https://github.com/ph4r05/ph4-walkingpad).
+
+## License
+
+[Apache License 2.0](LICENSE)

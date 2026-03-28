@@ -3,12 +3,25 @@ import Foundation
 
 public typealias OnChangeCallback = (_ change: Change) -> Void
 
+/// Snapshot of the current workout counters, used for MQTT publishing.
 struct WorkoutState {
     var steps: Int
     var distance: Int
     var walkingSeconds: Int
 }
 
+/// Accumulates daily step/distance/time totals from treadmill state updates.
+///
+/// This is the central data model for the UI — its `@Published` properties drive
+/// SwiftUI re-renders via `@EnvironmentObject`. Data is persisted to `workouts.json`
+/// and reloaded on launch.
+///
+/// Key behaviors:
+/// - Computes diffs between consecutive BLE state updates to accumulate counters
+/// - Guards against negative diffs (treadmill counter reset) and reconnection bursts
+/// - Resets daily counters at midnight (checked every polling interval)
+/// - Fires `onChangeCallback` for the StepsUploader to detect treadmill stop events
+/// - Saves on speed changes; keeps up to 500 historical workout entries
 class Workout: ObservableObject {
     @Published
     public var steps: Int = 0
@@ -27,6 +40,8 @@ class Workout: ObservableObject {
         self.load()
     }
     
+    /// Zeroes daily counters if the date has changed since the last update.
+    /// Note: only compares day-of-month, not full date — see KNOWN_ISSUES.md #9.
     public func resetIfDateChanged() {
         let now = Date()
         if now.get(.day) != self.lastUpdateTime.get(.day) && self.steps > 0 {
@@ -36,6 +51,9 @@ class Workout: ObservableObject {
         }
     }
     
+    /// Processes a BLE state update by computing diffs and accumulating daily totals.
+    /// Guards against negative diffs (treadmill reset) and initial reconnection state.
+    /// Fires `onChangeCallback` with a Change struct for the StepsUploader.
     public func update(_ oldState: DeviceState?, _ newState: DeviceState) {
         self.resetIfDateChanged()
 
@@ -71,6 +89,8 @@ class Workout: ObservableObject {
     }
     
     
+    /// Persists the current day's workout data to workouts.json.
+    /// Replaces today's entry in the history and writes the full array.
     public func save() {
         let workoutData = WorkoutSaveData(steps: self.steps, distance: self.distance, walkingSeconds: self.walkingSeconds, date: self.lastUpdateTime)
         let withoutToday = loadAll().filter { !Calendar.current.isDateInToday($0.date)}
@@ -85,6 +105,7 @@ class Workout: ObservableObject {
         }
     }
     
+    /// Restores today's workout data from persisted storage on app launch.
     public func load() {
         if (self.steps > 0) {
             return
@@ -100,6 +121,7 @@ class Workout: ObservableObject {
         }
     }
     
+    /// Loads all historical workout entries. Silently truncates to the most recent 500.
     public func loadAll() -> [WorkoutSaveData] {
         let jsonDecoder = JSONDecoder()
         do {

@@ -1,6 +1,8 @@
 import SwiftUI
 import CoreBluetooth
 
+/// Formats a distance value for display. Shows meters below 10km, km above.
+/// Note: threshold is 10,000m (10km) rather than the more common 1,000m — see KNOWN_ISSUES.md #15.
 func distanceTextFor(_ meters: Int) -> String {
     if (meters < 10000) {
         return "\(meters) m"

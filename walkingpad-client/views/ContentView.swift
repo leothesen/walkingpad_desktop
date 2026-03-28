@@ -1,10 +1,12 @@
 import SwiftUI
 
+/// Root view for the status bar popover.
+/// Shows DeviceView when a treadmill is connected, otherwise WaitingForTreadmillView.
 struct ContentView: View {
     @EnvironmentObject var walkingPadService: WalkingPadService
     @EnvironmentObject var workout: Workout
-    
-    
+
+
     var body: some View {
         
         VStack {
