@@ -39,10 +39,10 @@ struct FooterView: View {
     }
 
     private func openStatsWindow() {
-        // Bring existing window to front if already open
-        if let existing = FooterView.statsWindow, existing.isVisible {
-            existing.makeKeyAndOrderFront(nil)
-            return
+        // Close existing window so we always show fresh data
+        if let existing = FooterView.statsWindow {
+            existing.close()
+            FooterView.statsWindow = nil
         }
 
         let viewModel = StatsViewModel(workouts: workout.loadAll())

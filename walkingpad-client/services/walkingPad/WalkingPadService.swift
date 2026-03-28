@@ -52,7 +52,9 @@ open class WalkingPadService: NSObject, CBPeripheralDelegate, ObservableObject {
     public func onDisconnect() {
         print("WalkingPad device disconnected, setting state to nil")
         self.notifyZeroSpeed()
-        self.lastState = nil
+        DispatchQueue.main.async {
+            self.lastState = nil
+        }
     }
 
     /// Synthesizes a zero-speed state from the last known state and fires the callback.
@@ -137,8 +139,11 @@ open class WalkingPadService: NSObject, CBPeripheralDelegate, ObservableObject {
                 statusType: statusType
             )
 
-            self.callback?(self.lastState, status)
-            self.lastState = status
+            let previousState = self.lastState
+            DispatchQueue.main.async {
+                self.lastState = status
+            }
+            self.callback?(previousState, status)
         }
     }
 
