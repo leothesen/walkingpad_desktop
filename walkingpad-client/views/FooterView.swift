@@ -6,23 +6,35 @@ struct FooterView: View {
     @EnvironmentObject var walkingPadService: WalkingPadService
     @EnvironmentObject var workout: Workout
     @Environment(\.openURL) var openURL
-    
+
     var body: some View {
-        HStack {
+        HStack(spacing: 8) {
             Spacer()
             Button(action: {
                 openURL(URL(string: "https://walkingpad-stats.netlify.app")!)
             }) {
                 Text("Stats")
+                    .font(.caption.weight(.medium))
             }
+            .buttonStyle(.plain)
+            .padding(.horizontal, 8)
+            .padding(.vertical, 4)
+            .glassEffect(.regular.interactive(), in: .capsule)
+
             LoginLogoutButton()
+
             Button(action: {
                 walkingPadService.command()?.setSpeed(speed: 0)
                 workout.save()
                 exit(0)
             }) {
                 Text("Quit")
+                    .font(.caption.weight(.medium))
             }
+            .buttonStyle(.plain)
+            .padding(.horizontal, 8)
+            .padding(.vertical, 4)
+            .glassEffect(.regular.interactive(), in: .capsule)
         }
     }
 }

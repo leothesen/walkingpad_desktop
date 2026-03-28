@@ -17,58 +17,78 @@ struct RunningView: View {
                 self.walkingPadService.command()?.setSpeed(speed: UInt8(speed))
             }) {
                 Text(String(format: "%.1f", Float(speed) / 10.0))
+                    .font(.caption2.weight(.medium))
+                    .frame(minWidth: 32)
             }
-            .background(speedLevel == speed ? Color.accentColor : Color.clear)
-            .foregroundColor(speedLevel == speed ? Color.white : Color.black)
-            .cornerRadius(5)
+            .buttonStyle(.plain)
+            .padding(.horizontal, 6)
+            .padding(.vertical, 4)
+            .glassEffect(
+                speedLevel == speed ? .regular.tint(.accentColor).interactive() : .regular.interactive(),
+                in: .rect(cornerRadius: 8)
+            )
         }
-        
+
         let renderWalkingModeButton = {(mode: WalkingMode) in
             Button(action: { self.walkingPadService.command()?.setWalkingMode(mode: mode)}) {
                 Text(mode == .manual ? "Manual" : "Automatic")
+                    .font(.caption.weight(.medium))
             }
-            .background(mode == state?.walkingMode ? Color.accentColor : Color.clear)
-            .foregroundColor(mode == state?.walkingMode ? Color.white : Color.black)
-            .cornerRadius(5)
+            .buttonStyle(.plain)
+            .padding(.horizontal, 10)
+            .padding(.vertical, 5)
+            .glassEffect(
+                mode == state?.walkingMode ? .regular.tint(.accentColor).interactive() : .regular.interactive(),
+                in: .capsule
+            )
         }
-        
+
         let renderRow = { (start: Int, end: Int) in
-            HStack {
+            HStack(spacing: 4) {
                 ForEach(start..<end, id: \.self) { index in
                     let targetSpeed = (index * 10) / 2 + 10
                     renderButton(targetSpeed)
                 }
             }
         }
-        
+
         let renderSpeedRows = {
             ForEach(0..<4) { index in
                 let start = index * 4
                 renderRow(start, start + 4)
             }
         }
-        
-        VStack {
+
+        VStack(spacing: 10) {
             WorkoutStateView()
-            
+
             if (state?.walkingMode == .manual) {
-                renderSpeedRows()
+                VStack(spacing: 4) {
+                    renderSpeedRows()
+                }
             } else {
-                Text("Speed: \(String(format: "%.00f km/h", Double(speedLevel) / 10))")
+                Text("Speed: \(String(format: "%.1f km/h", Double(speedLevel) / 10))")
+                    .font(.title3.weight(.semibold))
+                    .padding(8)
+                    .glassEffect(.regular, in: .rect(cornerRadius: 10))
             }
-            
-            HStack {
+
+            HStack(spacing: 8) {
                 renderWalkingModeButton(.manual)
                 renderWalkingModeButton(.automatic)
             }
-            
-            HStack {
-                Button(action: {
-                    self.walkingPadService.command()?.setSpeed(speed: 0)
-                }) {
-                    Text("Stop")
-                }
+
+            Button(action: {
+                self.walkingPadService.command()?.setSpeed(speed: 0)
+            }) {
+                Text("Stop")
+                    .font(.body.weight(.semibold))
+                    .foregroundStyle(.red)
+                    .frame(maxWidth: .infinity)
             }
+            .buttonStyle(.plain)
+            .padding(.vertical, 6)
+            .glassEffect(.regular.tint(.red.opacity(0.15)).interactive(), in: .capsule)
         }
     }
 }
