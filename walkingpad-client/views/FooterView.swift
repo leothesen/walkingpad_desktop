@@ -46,7 +46,7 @@ struct FooterView: View {
         }
 
         let viewModel = StatsViewModel(workouts: workout.loadAll())
-        let statsView = StatsWindowView(viewModel: viewModel)
+        let statsView = StatsWindowView(viewModel: viewModel, walkingPadService: walkingPadService)
         let hostingView = NSHostingView(rootView: statsView)
 
         let window = NSWindow(

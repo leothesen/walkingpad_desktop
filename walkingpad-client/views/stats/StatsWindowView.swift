@@ -5,17 +5,29 @@ import Charts
 /// Layout hierarchy: hero distance → trend chart → supporting metrics → consistency streak.
 struct StatsWindowView: View {
     @StateObject var viewModel: StatsViewModel
+    var walkingPadService: WalkingPadService?
+    @State private var showDebug = false
 
     var body: some View {
         GlassEffectContainer {
             VStack(spacing: 14) {
-                // Time range selector
-                Picker("Range", selection: $viewModel.selectedRange.animation(.spring(duration: 0.35))) {
-                    ForEach(TimeRange.allCases, id: \.self) { range in
-                        Text(range.rawValue).tag(range)
+                // Time range selector + debug toggle
+                HStack {
+                    Picker("Range", selection: $viewModel.selectedRange.animation(.spring(duration: 0.35))) {
+                        ForEach(TimeRange.allCases, id: \.self) { range in
+                            Text(range.rawValue).tag(range)
+                        }
                     }
+                    .pickerStyle(.segmented)
+
+                    Button(action: { withAnimation(.spring(duration: 0.25)) { showDebug.toggle() } }) {
+                        Image(systemName: showDebug ? "ladybug.fill" : "ladybug")
+                            .font(.body)
+                            .foregroundStyle(showDebug ? .blue : .secondary)
+                    }
+                    .buttonStyle(.plain)
+                    .help("Toggle debug panel")
                 }
-                .pickerStyle(.segmented)
 
                 // 1. Hero: Distance
                 heroDistance
@@ -28,6 +40,19 @@ struct StatsWindowView: View {
 
                 // 4. Consistency streak
                 consistencySection
+
+                // 5. Debug panel (expandable)
+                if showDebug {
+                    Divider().opacity(0.3)
+                    if let service = walkingPadService {
+                        DebugView(
+                            workouts: viewModel.allWorkouts,
+                            walkingPadService: service
+                        )
+                        .frame(minHeight: 200)
+                        .transition(.move(edge: .bottom).combined(with: .opacity))
+                    }
+                }
             }
             .padding(16)
         }

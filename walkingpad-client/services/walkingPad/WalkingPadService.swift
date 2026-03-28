@@ -30,13 +30,35 @@ public struct WalkingPadConnection {
 /// [8-10] Distance (big-endian, multiply by 10)
 /// [11-13] Steps (big-endian)
 /// ```
+/// A single timestamped BLE log entry for the debug console.
+public struct BLELogEntry: Identifiable {
+    public let id = UUID()
+    public let time: Date
+    public let message: String
+}
+
 open class WalkingPadService: NSObject, CBPeripheralDelegate, ObservableObject {
 
     private var connection: WalkingPadConnection?
     @Published
     private var lastState: DeviceState? = nil
 
+    /// Rolling buffer of recent BLE events for the debug console (max 200).
+    @Published
+    public var debugLog: [BLELogEntry] = []
+    private let maxLogEntries = 200
+
     public var callback: TreadmillCallback?
+
+    private func log(_ message: String) {
+        let entry = BLELogEntry(time: Date(), message: message)
+        DispatchQueue.main.async {
+            self.debugLog.append(entry)
+            if self.debugLog.count > self.maxLogEntries {
+                self.debugLog.removeFirst(self.debugLog.count - self.maxLogEntries)
+            }
+        }
+    }
 
     /// Called by BluetoothDiscoveryService when a WalkingPad device is identified and connected.
     /// Subscribes to FE01 notifications to start receiving status updates.
@@ -44,13 +66,16 @@ open class WalkingPadService: NSObject, CBPeripheralDelegate, ObservableObject {
         self.connection = connection
         self.connection?.peripheral.delegate = self
         connection.peripheral.setNotifyValue(true, for: connection.notifyCharacteristic)
-        print("Initialized walking pad connection to \(connection.peripheral.name ?? "unknown")")
+        let name = connection.peripheral.name ?? "unknown"
+        print("Initialized walking pad connection to \(name)")
+        log("Connected to \(name)")
     }
 
     /// Called on BLE disconnect. Fires a zero-speed callback to trigger upload/save
     /// logic that depends on the treadmill stopping, then clears state.
     public func onDisconnect() {
         print("WalkingPad device disconnected, setting state to nil")
+        log("Disconnected")
         self.notifyZeroSpeed()
         DispatchQueue.main.async {
             self.lastState = nil
@@ -113,11 +138,16 @@ open class WalkingPadService: NSObject, CBPeripheralDelegate, ObservableObject {
         if let value = characteristic.value {
 
             let byteArray = [UInt8](value)
+
+            let hexString = byteArray.map { String(format: "%02x", $0) }.joined(separator: " ")
+            log("RX [\(byteArray.count)B] \(hexString)")
+
             guard let statusType = statusTypeFrom(Array(byteArray[0...2])) else { return }
             guard let connection = self.connection else { return }
 
             // Need at least 14 bytes to read steps at index 11-13
             if (byteArray.count < 13) {
+                log("⚠ Short payload: \(byteArray.count) bytes")
                 print("Unknown status array length")
                 return
             }
@@ -127,6 +157,9 @@ open class WalkingPadService: NSObject, CBPeripheralDelegate, ObservableObject {
             let distance = sumFrom(Array(byteArray[8...10])) * 10
             let steps = sumFrom(Array(byteArray[11...13]))
             let walkingTimeSeconds = sumFrom(Array(byteArray[5...7]))
+
+            let type = statusType == .currentStatus ? "curr" : "last"
+            log("\(type) spd=\(speed) steps=\(steps) dist=\(distance) time=\(walkingTimeSeconds)s mode=\(isManualMode ? "M" : "A")")
 
             let status = DeviceState(
                 time: Date(),

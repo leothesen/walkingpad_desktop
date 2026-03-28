@@ -42,6 +42,7 @@
 		B200000400000000000000BB /* StatsWindowView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B200000300000000000000BB /* StatsWindowView.swift */; };
 		B200000600000000000000BB /* DailyDistanceChart.swift in Sources */ = {isa = PBXBuildFile; fileRef = B200000500000000000000BB /* DailyDistanceChart.swift */; };
 		B200000800000000000000BB /* ActivityHeatmap.swift in Sources */ = {isa = PBXBuildFile; fileRef = B200000700000000000000BB /* ActivityHeatmap.swift */; };
+		C300000200000000000000CC /* DebugView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C300000100000000000000CC /* DebugView.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -81,6 +82,7 @@
 		B200000300000000000000BB /* StatsWindowView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StatsWindowView.swift; sourceTree = "<group>"; };
 		B200000500000000000000BB /* DailyDistanceChart.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DailyDistanceChart.swift; sourceTree = "<group>"; };
 		B200000700000000000000BB /* ActivityHeatmap.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ActivityHeatmap.swift; sourceTree = "<group>"; };
+		C300000100000000000000CC /* DebugView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DebugView.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -214,6 +216,7 @@
 				B200000300000000000000BB /* StatsWindowView.swift */,
 				B200000500000000000000BB /* DailyDistanceChart.swift */,
 				B200000700000000000000BB /* ActivityHeatmap.swift */,
+			C300000100000000000000CC /* DebugView.swift */,
 			);
 			path = stats;
 			sourceTree = "<group>";
@@ -327,6 +330,7 @@
 			B200000400000000000000BB /* StatsWindowView.swift in Sources */,
 			B200000600000000000000BB /* DailyDistanceChart.swift in Sources */,
 			B200000800000000000000BB /* ActivityHeatmap.swift in Sources */,
+			C300000200000000000000CC /* DebugView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
