@@ -1,5 +1,7 @@
 import SwiftUI
 
+/// Bottom bar with Stats link, Login/Logout button, and Quit button.
+/// Warning: Quit uses exit(0) which bypasses cleanup — see KNOWN_ISSUES.md #8.
 struct FooterView: View {
     @EnvironmentObject var walkingPadService: WalkingPadService
     @EnvironmentObject var workout: Workout

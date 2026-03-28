@@ -2,12 +2,24 @@ import Foundation
 import Combine
 import Security
 
+/// Manages authentication and step uploads for the HCGateway health sync service.
+///
+/// HCGateway is a bridge service (https://api.hcgateway.shuchir.dev) that syncs
+/// health data to Google Fit. Users authenticate with username/password credentials
+/// that match their HCGateway mobile app account.
+///
+/// Token storage:
+/// - Access token: macOS Keychain (kSecClassGenericPassword)
+/// - Refresh token: macOS Keychain (kSecClassGenericPassword)
+/// - Expiry date: UserDefaults
+///
+/// On 401/403 during a push, automatically attempts one token refresh + retry.
 class HCGatewayService: ObservableObject {
     private let api = HCGatewayAPI()
     @Published private(set) var accessToken: String?
     @Published private(set) var refreshToken: String?
     private var expiryDate: Date?
-      
+
     private let accessTokenKey = "accessToken"
     private let refreshTokenKey = "refreshToken"
     private let expiryDateKey = "expiryDate"
