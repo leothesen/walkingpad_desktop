@@ -9,10 +9,20 @@ struct LoginLogoutButton: View {
             Button("Login") {
                 openLoginWindow()
             }
+            .buttonStyle(.plain)
+            .font(.caption.weight(.medium))
+            .padding(.horizontal, 8)
+            .padding(.vertical, 4)
+            .glassEffect(.regular.interactive(), in: .capsule)
         } else {
             Button("Logout") {
                 gatewayService.logout()
             }
+            .buttonStyle(.plain)
+            .font(.caption.weight(.medium))
+            .padding(.horizontal, 8)
+            .padding(.vertical, 4)
+            .glassEffect(.regular.interactive(), in: .capsule)
         }
     }
     

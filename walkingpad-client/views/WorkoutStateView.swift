@@ -28,16 +28,23 @@ func formatTime(_ seconds: Int) -> String {
 struct WorkoutStateView: View {
     @EnvironmentObject
     var workout: Workout
-    
+
     @EnvironmentObject
     var walkingPadService: WalkingPadService
 
     var body: some View {
         let statusSeconds = walkingPadService.lastStatus()?.walkingTimeSeconds ?? 0
-        VStack {
-            Text("\(formatTime(workout.walkingSeconds)) (\(formatTime(statusSeconds)))")
-            Text("\(workout.steps) Steps")
+        VStack(spacing: 2) {
             Text("\(distanceTextFor(workout.distance))")
+                .font(.title2.weight(.semibold))
+            HStack(spacing: 8) {
+                Text("\(workout.steps) steps")
+                Text("\(formatTime(workout.walkingSeconds))")
+            }
+            .font(.caption)
+            .foregroundStyle(.secondary)
         }
+        .padding(10)
+        .glassEffect(.regular, in: .rect(cornerRadius: 12))
     }
 }

@@ -6,21 +6,21 @@ struct ContentView: View {
     @EnvironmentObject var walkingPadService: WalkingPadService
     @EnvironmentObject var workout: Workout
 
-
     var body: some View {
-        
-        VStack {
-            if walkingPadService.isConnected() {
-                DeviceView()
-            } else {
-                WaitingForTreadmillView()
+        GlassEffectContainer {
+            VStack(spacing: 12) {
+                if walkingPadService.isConnected() {
+                    DeviceView()
+                } else {
+                    WaitingForTreadmillView()
+                }
+
+                Spacer()
+
+                FooterView()
             }
-            
-            Spacer()
-        
-  
-            FooterView()
-        }.padding(10)
+            .padding(12)
+        }
     }
 }
 
