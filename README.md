@@ -32,8 +32,6 @@ The original app provided basic BLE treadmill control and step tracking. This fo
 
 ## Screenshots
 
-> **Note**: These screenshots are from the original app. The UI has been redesigned with Liquid Glass effects and a new layout. New screenshots would be helpful here.
-
 ![Tray App](docs/tray_app.png)
 ![Stats](docs/stats.png)
 
@@ -51,9 +49,7 @@ Download the latest `.zip` from the [releases section](https://github.com/leothe
 
 On first launch: **System Settings → Privacy & Security → "Open Anyway"** (the app is not notarized).
 
-Grant Bluetooth permissions when prompted:
-
-![Bluetooth Permission](docs/bluetooth_connection.png)
+Grant Bluetooth permissions when prompted.
 
 ### Building from Source
 
