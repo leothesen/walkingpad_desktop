@@ -123,13 +123,42 @@ For Home Assistant integration, create a config file at:
 
 ## Creating a Release
 
-1. Build in Xcode: **Product → Archive**
-2. In the Organizer: **Distribute App → Copy App**
-3. Zip the `.app` bundle
-4. Go to GitHub → Releases → **Create a new release**
-5. Create a new tag (e.g., `v0.1.0`), write release notes
-6. Attach the zip file
-7. Publish
+### Build the app bundle
+
+From the project root, run:
+
+```bash
+# Build in Release mode with ad-hoc signing
+xcodebuild -scheme walkingpad-client \
+  -configuration Release \
+  -derivedDataPath build \
+  CODE_SIGN_IDENTITY="-"
+
+# Zip the .app bundle
+cd build/Build/Products/Release
+zip -r ../../../../WalkingPad-Client.zip "Walkingpad Client.app"
+cd ../../../..
+```
+
+This produces `WalkingPad-Client.zip` in the project root containing the standalone `.app` bundle.
+
+> **Important**: Zip the `.app`, not the `.xcarchive`. The `.app` is a double-clickable application. An `.xcarchive` will open in Xcode instead.
+
+### Publish to GitHub
+
+1. Go to your repo → **Releases** → **Create a new release**
+2. Create a new tag (e.g., `v0.1.0`)
+3. Write release notes (or use "Generate release notes")
+4. Drag `WalkingPad-Client.zip` into the assets area
+5. Publish
+
+### Installing from a release
+
+1. Download `WalkingPad-Client.zip` from the release
+2. Unzip — you'll get `Walkingpad Client.app`
+3. Drag to `/Applications` (optional, can run from anywhere)
+4. Double-click to open
+5. On first launch: **System Settings → Privacy & Security → "Open Anyway"** (the app is ad-hoc signed, not notarized)
 
 ## Project Structure
 
