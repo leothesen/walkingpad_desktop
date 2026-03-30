@@ -77,6 +77,17 @@ struct RunningView: View {
             .buttonStyle(.plain)
             .padding(.vertical, 4)
             .glassEffect(.regular.tint(.red.opacity(0.1)).interactive(), in: .capsule)
+
+            Button(action: { stopAndFinishDay() }) {
+                Text("Stop & Finish Day")
+                    .font(.caption2.weight(.medium))
+                    .foregroundStyle(.orange)
+                    .frame(maxWidth: .infinity)
+                    .contentShape(Capsule())
+            }
+            .buttonStyle(.plain)
+            .padding(.vertical, 3)
+            .glassEffect(.regular.tint(.orange.opacity(0.1)).interactive(), in: .capsule)
         }
         .onAppear { sliderSpeed = max(currentSpeed, 0.5) }
         .onChange(of: state?.speed) { _, newSpeed in
@@ -84,6 +95,29 @@ struct RunningView: View {
             let reported = Double(newSpeed ?? 0) / 10.0
             if reported > 0 && abs(reported - sliderSpeed) > 0.05 {
                 sliderSpeed = reported
+            }
+        }
+    }
+
+    private func stopAndFinishDay() {
+        walkingPadService.command()?.setSpeed(speed: 0)
+
+        let notion: NotionService
+        let strava: StravaService
+        if let appDelegate = NSApp.delegate as? AppDelegate {
+            notion = appDelegate.notionService
+            strava = appDelegate.stravaService
+        } else {
+            notion = NotionService()
+            strava = StravaService()
+        }
+
+        // Wait a moment for the session to finalize, then post to Strava
+        Task {
+            try? await Task.sleep(for: .seconds(15))
+            if let sessions = await notion.fetchTodaySessions(), !sessions.isEmpty {
+                let success = await strava.postTodayActivity(sessions: sessions)
+                print("Stop & Finish Day: Strava post \(success ? "succeeded" : "failed")")
             }
         }
     }
