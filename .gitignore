@@ -4,3 +4,5 @@ Carthage
 walkingpad-client.xcodeproj/project.xcworkspace/xcuserdata
 walkingpad-client.xcodeproj/xcuserdata
 walkingpad-client 2026-03-30*
+/build
+*.zip
