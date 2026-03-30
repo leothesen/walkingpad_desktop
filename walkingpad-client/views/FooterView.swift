@@ -1,7 +1,6 @@
 import SwiftUI
 
 /// Bottom bar with Stats and Quit buttons, pinned to the bottom of the popover.
-/// Warning: Quit uses exit(0) which bypasses cleanup — see KNOWN_ISSUES.md #8.
 struct FooterView: View {
     @EnvironmentObject var walkingPadService: WalkingPadService
     @EnvironmentObject var workout: Workout
@@ -37,7 +36,7 @@ struct FooterView: View {
             Button(action: {
                 walkingPadService.command()?.setSpeed(speed: 0)
                 workout.save()
-                exit(0)
+                NSApplication.shared.terminate(nil)
             }) {
                 Text("Quit")
                     .font(.caption2.weight(.medium))

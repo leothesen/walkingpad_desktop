@@ -20,7 +20,6 @@
 		5B440555282FD38000A29A8D /* WorkoutsSaveData.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5B440554282FD38000A29A8D /* WorkoutsSaveData.swift */; };
 		5B645D6F2660DF32003B03D7 /* WorkoutStateView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5B645D6E2660DF32003B03D7 /* WorkoutStateView.swift */; };
 		5B9E0E4B263560CE0087ECC0 /* BluetoothPeripheral.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5B9E0E4A263560CE0087ECC0 /* BluetoothPeripheral.swift */; };
-		5BA17245263EA5810010E483 /* EmptyView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5BA17244263EA5810010E483 /* EmptyView.swift */; };
 		5BA17247263EBAC80010E483 /* FooterView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5BA17246263EBAC80010E483 /* FooterView.swift */; };
 		5BA17249263EBBDC0010E483 /* WaitingForTreadmillView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5BA17248263EBBDC0010E483 /* WaitingForTreadmillView.swift */; };
 		5BA1724D263EC1680010E483 /* DeviceState.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5BA1724C263EC1680010E483 /* DeviceState.swift */; };
@@ -61,7 +60,6 @@
 		5B440554282FD38000A29A8D /* WorkoutsSaveData.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkoutsSaveData.swift; sourceTree = "<group>"; };
 		5B645D6E2660DF32003B03D7 /* WorkoutStateView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkoutStateView.swift; sourceTree = "<group>"; };
 		5B9E0E4A263560CE0087ECC0 /* BluetoothPeripheral.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BluetoothPeripheral.swift; sourceTree = "<group>"; };
-		5BA17244263EA5810010E483 /* EmptyView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EmptyView.swift; sourceTree = "<group>"; };
 		5BA17246263EBAC80010E483 /* FooterView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FooterView.swift; sourceTree = "<group>"; };
 		5BA17248263EBBDC0010E483 /* WaitingForTreadmillView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WaitingForTreadmillView.swift; sourceTree = "<group>"; };
 		5BA1724C263EC1680010E483 /* DeviceState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeviceState.swift; sourceTree = "<group>"; };
@@ -152,7 +150,6 @@
 				B200000A00000000000000BB /* stats */,
 				5B2C72EC263469DD00CE4F88 /* DeviceView.swift */,
 				5B2C72DA263468B800CE4F88 /* ContentView.swift */,
-				5BA17244263EA5810010E483 /* EmptyView.swift */,
 				5BA17246263EBAC80010E483 /* FooterView.swift */,
 				5BA17248263EBBDC0010E483 /* WaitingForTreadmillView.swift */,
 				5BA1724E263ECF720010E483 /* RunningView.swift */,
@@ -310,7 +307,6 @@
 				A100000800000000000000AA /* MqttService.swift in Sources */,
 				5BA17259263EF74F0010E483 /* DateExtension.swift in Sources */,
 				5B44054E282F994400A29A8D /* BluetoothDiscoveryService.swift in Sources */,
-				5BA17245263EA5810010E483 /* EmptyView.swift in Sources */,
 				5BA17253263EDB0F0010E483 /* Workout.swift in Sources */,
 				5B440553282FA72600A29A8D /* WalkingPadCommand.swift in Sources */,
 				5BA17251263ED5670010E483 /* StoppedOrPauseView.swift in Sources */,
