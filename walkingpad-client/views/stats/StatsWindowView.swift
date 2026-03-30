@@ -7,6 +7,7 @@ struct StatsWindowView: View {
     @StateObject var viewModel: StatsViewModel
     var walkingPadService: WalkingPadService?
     @State private var showDebug = false
+    @State private var hoverFraction: CGFloat = 0.5
 
     var body: some View {
         GlassEffectContainer {
@@ -61,63 +62,49 @@ struct StatsWindowView: View {
     // MARK: - Hero Distance
 
     private var heroDistance: some View {
-        VStack(spacing: 2) {
-            HStack(alignment: .firstTextBaseline, spacing: 4) {
-                Text(viewModel.distanceText)
-                    .font(.system(size: 42, weight: .bold, design: .rounded).monospacedDigit())
-                Text(viewModel.distanceUnit)
-                    .font(.title3.weight(.medium))
-                    .foregroundStyle(.secondary)
-            }
-
-            if let trend = viewModel.distanceTrend {
-                trendBadge(trend)
-            }
-
-            // Hover detail overlay
-            if let hovered = viewModel.hoveredPoint {
-                HStack(spacing: 12) {
-                    Text(hovered.date, format: .dateTime.weekday(.wide).month(.abbreviated).day())
-                    Text(String(format: "%.2f km", hovered.distanceKm))
-                        .fontWeight(.medium)
-                    Text("\(hovered.steps) steps")
-                }
-                .font(.caption)
+        HStack(alignment: .firstTextBaseline, spacing: 4) {
+            Text(viewModel.distanceText)
+                .font(.system(size: 42, weight: .bold, design: .rounded).monospacedDigit())
+            Text(viewModel.distanceUnit)
+                .font(.title3.weight(.medium))
                 .foregroundStyle(.secondary)
-                .transition(.opacity.combined(with: .move(edge: .top)))
-            }
         }
         .frame(maxWidth: .infinity)
-        .padding(.vertical, 4)
-    }
-
-    private func trendBadge(_ percent: Double) -> some View {
-        let isUp = percent >= 0
-        return HStack(spacing: 2) {
-            Image(systemName: isUp ? "arrow.up.right" : "arrow.down.right")
-                .font(.caption2.weight(.bold))
-            Text(String(format: "%.0f%%", abs(percent)))
-                .font(.caption.weight(.medium).monospacedDigit())
-            Text("vs prev period")
-                .font(.caption2)
-                .foregroundStyle(.secondary)
-        }
-        .foregroundStyle(isUp ? .green : .red)
+        .padding(.vertical, 2)
     }
 
     // MARK: - Trend Chart
 
     private var trendChart: some View {
-        VStack(alignment: .leading, spacing: 4) {
+        VStack(spacing: 0) {
+            // Tooltip sits above the chart
+            if let hovered = viewModel.hoveredPoint {
+                HStack(spacing: 6) {
+                    Text(hovered.date, format: .dateTime.weekday(.abbreviated).month(.abbreviated).day())
+                    Text("·").foregroundStyle(.quaternary)
+                    Text(String(format: "%.2f km", hovered.distanceKm))
+                        .fontWeight(.semibold)
+                    Text("·").foregroundStyle(.quaternary)
+                    Text("\(hovered.steps) steps")
+                }
+                .font(.caption2)
+                .padding(.horizontal, 8)
+                .padding(.vertical, 4)
+                .background(.ultraThinMaterial, in: Capsule())
+                .padding(.bottom, 4)
+                .transition(.opacity.animation(.easeOut(duration: 0.12)))
+            }
+
             DistanceTrendChart(
                 points: viewModel.dailyPoints,
                 isMonthly: viewModel.selectedRange == .allTime,
-                hoveredPoint: $viewModel.hoveredPoint
+                hoveredPoint: $viewModel.hoveredPoint,
+                hoverFraction: $hoverFraction
             )
             .frame(height: 140)
+            .padding(12)
+            .glassEffect(.regular, in: .rect(cornerRadius: 14))
         }
-        .padding(12)
-        .glassEffect(.regular, in: .rect(cornerRadius: 14))
     }
 
     // MARK: - Supporting Metrics
