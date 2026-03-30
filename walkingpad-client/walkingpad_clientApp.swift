@@ -58,11 +58,15 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             }
         }
 
-        // Push completed sessions to Notion
+        // Push completed sessions to Notion, clear local data on success
         workout.onSessionComplete = { [weak self] session, sessionNumber in
-            guard let notionService = self?.notionService else { return }
+            guard let self = self, self.notionService.isConfigured else { return }
             Task {
-                await notionService.pushSession(session, sessionNumber: sessionNumber)
+                let success = await self.notionService.pushSession(session, sessionNumber: sessionNumber)
+                if success {
+                    print("Notion push succeeded, clearing local workout data")
+                    FileSystem().save(filename: "workouts.json", data: try! JSONEncoder().encode(WorkoutsSaveData(workouts: [])))
+                }
             }
         }
 

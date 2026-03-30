@@ -40,8 +40,14 @@ struct FooterView: View {
         }
     }
 
-    private var notionService: NotionService? {
-        (NSApp.delegate as? AppDelegate)?.notionService
+    private var notionService: NotionService {
+        // Access via AppDelegate; if cast fails, create a standalone instance
+        // that still reads from Keychain (config persists across instances)
+        if let appDelegate = NSApp.delegate as? AppDelegate {
+            return appDelegate.notionService
+        }
+        print("Warning: could not access AppDelegate, creating standalone NotionService")
+        return NotionService()
     }
 
     private func openStatsWindow() {
@@ -51,13 +57,19 @@ struct FooterView: View {
             FooterView.statsWindow = nil
         }
 
-        // Start with local data, then try Notion
-        let localWorkouts = workout.loadAll()
-        let viewModel = StatsViewModel(workouts: localWorkouts)
+        let notion = notionService
+        let notionConfigured = notion.isConfigured
+
+        // If Notion is configured, start empty and load from Notion only.
+        // Otherwise fall back to local data.
+        let initialWorkouts = notionConfigured ? [] : workout.loadAll()
+        let viewModel = StatsViewModel(workouts: initialWorkouts)
+        if notionConfigured { viewModel.isLoading = true }
+
         let statsView = StatsWindowView(
             viewModel: viewModel,
             walkingPadService: walkingPadService,
-            notionService: notionService
+            notionService: notion
         )
         let hostingView = NSHostingView(rootView: statsView)
 
@@ -76,19 +88,23 @@ struct FooterView: View {
 
         FooterView.statsWindow = window
 
-        // Fetch from Notion in background, replace data when ready
-        if let notion = notionService, notion.isConfigured {
-            viewModel.isLoading = true
+        // Fetch from Notion — only source of truth when configured
+        if notionConfigured {
             Task {
                 if let sessions = await notion.fetchAllSessions() {
                     let workouts = NotionService.groupSessionsByDate(sessions)
+                    print("Stats: replacing with \(workouts.count) days from Notion (\(sessions.count) sessions)")
+                    for w in workouts {
+                        print("  Day: \(w.date), steps=\(w.steps), dist=\(w.distance), sessions=\(w.sessions?.count ?? 0)")
+                    }
                     await MainActor.run {
                         viewModel.replaceWorkouts(workouts, source: "Notion")
                     }
                 } else {
+                    // Notion unreachable — fall back to local as emergency
+                    let localWorkouts = workout.loadAll()
                     await MainActor.run {
-                        viewModel.isLoading = false
-                        viewModel.dataSource = "local (Notion unavailable)"
+                        viewModel.replaceWorkouts(localWorkouts, source: "local (Notion unavailable)")
                     }
                 }
             }

@@ -177,6 +177,9 @@ class NotionService: ObservableObject {
         }
 
         print("Notion: fetched \(allSessions.count) sessions")
+        for (i, s) in allSessions.enumerated() {
+            print("  Notion session \(i): start=\(s.startTime) end=\(s.endTime) steps=\(s.steps) dist=\(s.distance)")
+        }
         return allSessions
     }
 
@@ -307,6 +310,7 @@ extension NotionService {
             grouped[components, default: []].append(session)
         }
 
+        print("Notion: grouping \(sessions.count) sessions into \(grouped.count) days")
         return grouped.compactMap { (components, daySessions) -> WorkoutSaveData? in
             guard let date = calendar.date(from: components) else { return nil }
             let totalSteps = daySessions.reduce(0) { $0 + $1.steps }

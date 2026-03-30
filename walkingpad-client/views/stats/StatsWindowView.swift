@@ -6,7 +6,7 @@ import Charts
 struct StatsWindowView: View {
     @StateObject var viewModel: StatsViewModel
     var walkingPadService: WalkingPadService?
-    var notionService: NotionService?
+    var notionService: NotionService
     @State private var showDebug = false
     @State private var hoverFraction: CGFloat = 0.5
 
@@ -31,27 +31,32 @@ struct StatsWindowView: View {
                     .help("Toggle debug panel")
                 }
 
-                // Loading indicator
                 if viewModel.isLoading {
-                    HStack(spacing: 6) {
-                        ProgressView().controlSize(.small)
+                    // Loading state — replaces content while fetching
+                    Spacer()
+                    VStack(spacing: 10) {
+                        ProgressView()
+                            .controlSize(.regular)
                         Text("Loading from Notion…")
-                            .font(.caption2)
+                            .font(.caption)
                             .foregroundStyle(.secondary)
                     }
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 40)
+                    Spacer()
+                } else {
+                    // 1. Hero: Distance
+                    heroDistance
+
+                    // 2. Trend chart
+                    trendChart
+
+                    // 3. Supporting metrics
+                    supportingMetrics
+
+                    // 4. Consistency streak
+                    consistencySection
                 }
-
-                // 1. Hero: Distance
-                heroDistance
-
-                // 2. Trend chart
-                trendChart
-
-                // 3. Supporting metrics
-                supportingMetrics
-
-                // 4. Consistency streak
-                consistencySection
 
                 // 5. Debug panel (expandable)
                 if showDebug, let service = walkingPadService {
@@ -59,7 +64,7 @@ struct StatsWindowView: View {
                     DebugView(
                         workouts: viewModel.allWorkouts,
                         walkingPadService: service,
-                        notionService: notionService ?? NotionService()
+                        notionService: notionService
                     )
                     .frame(minHeight: 200)
                     .transition(.move(edge: .bottom).combined(with: .opacity))
