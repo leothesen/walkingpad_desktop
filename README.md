@@ -1,82 +1,100 @@
-# WalkingPad macOS Client
+# WalkingPad Desktop
 
-A native macOS status-bar app for controlling and monitoring [WalkingPad](https://www.walkingpad.com/) treadmills over Bluetooth.
+A native macOS menu-bar app for controlling and monitoring [WalkingPad](https://www.walkingpad.com/) treadmills over Bluetooth. Forked from [klassm/walkingpad_macos_client](https://github.com/klassm/walkingpad_macos_client) and significantly extended with Notion sync, Strava integration, a redesigned stats dashboard, and macOS 26 Liquid Glass UI.
+
+## What's Changed from the Original
+
+The original app provided basic BLE treadmill control and step tracking. This fork adds:
+
+- **Notion as source of truth** — all session data synced to a Notion database, replacing local-only storage
+- **Strava integration** — post daily walking summaries to Strava via OAuth2
+- **Redesigned stats dashboard** — SwiftUI Charts with distance trends, activity heatmap, and session breakdowns
+- **Session-level tracking** — individual sessions with start/end times, not just daily totals
+- **macOS 26 Liquid Glass UI** — frosted glass effects throughout the menu bar popover
+- **Live status bar** — shows current session distance + time while walking, today's total when idle
+- **Speed slider** — replaced the 4x4 button grid with a slider + fine-tune +/- buttons
+- **60-minute notification** — macOS notification + auto speed reduction after 1 hour of continuous walking
+- **Stop & Finish Day** — one-tap button to stop the treadmill and post to Strava with confirmation
+- **Debug panel** — BLE console, raw data viewer, Notion/Strava config, activity log
+- **Removed legacy integrations** — Google Fit/HCGateway, Netlify stats app, OAuth2 framework dependency
 
 ## Features
 
-- **Bluetooth connection** — automatically discovers and connects to your WalkingPad treadmill
-- **Step tracking** — accumulates steps, distance, and walking time across sessions
-- **Speed control** — change speed directly from the menu bar (manual and automatic modes)
-- **Health sync** — upload steps to Google Fit via the [HCGateway](https://github.com/ShuchirJ/HCGateway) bridge app
-- **Statistics** — remembers past workouts and provides historical stats via an [external dashboard](https://walkingpad-stats.netlify.app)
-- **[Alfred](https://www.alfredapp.com/) workflow** — control your treadmill by keystroke ([download workflow](https://github.com/klassm/walkingpad_alfred/releases))
-- **MQTT publishing** — publish treadmill state for Home Assistant and other home automation tools
-- **Local HTTP API** — REST endpoints for programmatic control and integration
-
-## Installation
-
-Download the latest release from the [releases section](https://github.com/klassm/walkingpad_macos_client/releases).
-
-Grant the app Bluetooth permissions when prompted:
-
-![Bluetooth Permission](docs/bluetooth_connection.png)
-
-## Building from Source
-
-1. Open `walkingpad-client.xcodeproj` in Xcode 16.3+
-2. Dependencies are managed via Swift Package Manager and will resolve automatically
-3. Build with Cmd+B, run with Cmd+R
-4. The app appears in the menu bar (not the Dock)
-
-**Note:** `project.pbxproj` is gitignored. On a fresh clone you may need to recreate Xcode project settings and re-add source files to the target.
-
-### Dependencies
-
-| Package | Version | Purpose |
-|---------|---------|---------|
-| [Embassy](https://github.com/envoy/Embassy) | 4.1.6 | Embedded HTTP server for the local API |
-| [mqtt-nio](https://github.com/sroebert/mqtt-nio) | 2.8.1 | MQTT client for Home Assistant integration |
-| [swift-nio](https://github.com/apple/swift-nio) | 2.84.0 | Network I/O (mqtt-nio dependency) |
+- **Bluetooth connection** — automatically discovers and connects to your WalkingPad
+- **Speed control** — slider with +/- fine-tune buttons (0.1 km/h increments), manual/auto mode toggle
+- **Session tracking** — per-session distance, steps, duration, synced to Notion
+- **Notion sync** — sessions and daily totals stored in Notion databases
+- **Strava posting** — daily combined Walk activity with distance, steps, duration, avg speed
+- **Stats dashboard** — distance trend chart, session count, consistency streak, interactive hover
+- **MQTT publishing** — treadmill state for Home Assistant
+- **Local HTTP API** — REST endpoints on port 4934 for Alfred workflows
+- **60-min alert** — notification + speed reduction after 1 hour of walking
 
 ## Screenshots
+
+> **Note**: These screenshots are from the original app. The UI has been redesigned with Liquid Glass effects and a new layout. New screenshots would be helpful here.
 
 ![Tray App](docs/tray_app.png)
 ![Stats](docs/stats.png)
 
-## HTTP API
+## Requirements
 
-The app runs a local HTTP server on **port 4934** for Alfred workflow integration and external tools.
+- **macOS 26** (Tahoe) or later — required for Liquid Glass SwiftUI APIs
+- **Xcode 16.3+** with macOS 26 SDK
+- A WalkingPad treadmill with Bluetooth
 
-### Endpoints
+## Installation
 
-| Method | Path | Description |
-|--------|------|-------------|
-| GET | `/treadmill` | Current state: steps, distance, walkingSeconds, speed (km/h) |
-| GET | `/treadmill/workouts` | Historical workout data (up to 500 entries) |
-| POST | `/treadmill/start` | Start the treadmill |
-| POST | `/treadmill/stop` | Stop the treadmill (set speed to 0) |
-| POST | `/treadmill/faster` | Increase speed by 0.5 km/h |
-| POST | `/treadmill/slower` | Decrease speed by 0.5 km/h |
-| POST | `/treadmill/speed/{10-80}` | Set specific speed (multiples of 10, e.g., `/speed/30` = 3.0 km/h) |
+### From Releases
 
-### Example
+Download the latest `.zip` from the [releases section](https://github.com/leothesen/walkingpad_desktop/releases), unzip, and drag to Applications.
 
-```bash
-# Get current treadmill state
-curl http://localhost:4934/treadmill
+On first launch: **System Settings → Privacy & Security → "Open Anyway"** (the app is not notarized).
 
-# Start walking at 3.0 km/h
-curl -X POST http://localhost:4934/treadmill/start
-curl -X POST http://localhost:4934/treadmill/speed/30
-```
+Grant Bluetooth permissions when prompted:
 
-Returns 428 if treadmill is not connected.
+![Bluetooth Permission](docs/bluetooth_connection.png)
 
-## MQTT Configuration
+### Building from Source
 
-Publish the current treadmill state as MQTT messages for home automation (Home Assistant, etc.).
+1. Clone the repo
+2. Open `walkingpad-client.xcodeproj` in Xcode
+3. Dependencies resolve automatically via Swift Package Manager
+4. **Cmd+R** to build and run (appears in menu bar, not Dock)
 
-Create a config file at:
+## Setup Guide
+
+### 1. Basic Usage (no setup needed)
+
+The app connects to your WalkingPad automatically via Bluetooth. Use the menu bar dropdown to control speed and view session stats.
+
+### 2. Notion Integration (recommended)
+
+Notion stores all session data and daily totals. Without it, stats are local-only.
+
+1. Create a [Notion internal integration](https://www.notion.so/my-integrations) with read/write permissions
+2. Create a Notion page (e.g., "WalkingPad") and share it with your integration
+3. Create two inline databases on that page:
+   - **Sessions** — columns: Session (title), Date (date), Start Time (text), End Time (text), Duration (min) (number), Steps (number), Distance (m) (number)
+   - **Day totals** — columns: Day (title), Date (date), Total Distance (m) (number), Total Steps (number), Total Duration (min) (number), Sessions (number), Strava Posted At (text), Strava Activity ID (text)
+4. Add formula columns if desired: Distance (km), Avg Speed (km/h), Day of Week
+5. In the app: click **Stats → ladybug icon → Notion tab** → paste your API key and database ID → Save
+
+> **Tip**: If you have [Claude Code](https://claude.ai/claude-code) with the Notion MCP server configured, you can ask Claude to set up the databases and columns for you automatically.
+
+### 3. Strava Integration (optional)
+
+Post daily walking summaries to Strava as Walk activities.
+
+1. Register an API application at [strava.com/settings/api](https://www.strava.com/settings/api)
+2. Set the redirect URI to `http://localhost:8234/callback`
+3. In the app: click **Stats → ladybug icon → Strava tab** → paste Client ID and Client Secret → Save
+4. Click **Connect to Strava** → authorize in browser → done
+5. Use the upload icon in the footer (or "Stop & Finish Day") to post
+
+### 4. MQTT (optional)
+
+For Home Assistant integration, create a config file at:
 ```
 ~/Library/Containers/klassm.walkingpad-client/Data/Library/Autosave Information/.walkingpad-client-mqtt.json
 ```
@@ -91,75 +109,75 @@ Create a config file at:
 }
 ```
 
-The app reads this on startup and publishes messages on speed changes (or every 30 seconds):
+## HTTP API (Port 4934)
 
-```json
-{
-  "speedKmh": 1.5,
-  "stepsTotal": 19202,
-  "distanceTotal": 4690,
-  "stepsWalkingpad": 510
-}
-```
+| Method | Path | Description |
+|--------|------|-------------|
+| GET | `/treadmill` | Current state: steps, distance, walkingSeconds, speed |
+| GET | `/treadmill/workouts` | Historical workout data |
+| POST | `/treadmill/start` | Start the treadmill |
+| POST | `/treadmill/stop` | Stop (speed to 0) |
+| POST | `/treadmill/faster` | +0.5 km/h |
+| POST | `/treadmill/slower` | -0.5 km/h |
+| POST | `/treadmill/speed/{10-80}` | Set speed (multiples of 10) |
 
-### Home Assistant Example
+## Creating a Release
 
-```yaml
-mqtt:
-  sensor:
-    - name: "WalkingPad Speed"
-      object_id: "walkingpad_speed"
-      state_topic: "homeassistant/sensor/walkingpad"
-      value_template: "{{ value_json.speedKmh }}"
-      unit_of_measurement: "km/h"
-    - name: "WalkingPad Steps"
-      object_id: "walkingpad_steps"
-      state_topic: "homeassistant/sensor/walkingpad"
-      value_template: "{{ value_json.stepsTotal }}"
-      unit_of_measurement: "Steps"
-```
-
-## Health Sync (HCGateway)
-
-To sync steps to Google Fit:
-
-1. Install the [HCGateway](https://github.com/ShuchirJ/HCGateway) bridge app on your phone
-2. Create an account and connect Google Fit
-3. Click "Login" in the WalkingPad app footer
-4. Enter the same credentials you used for HCGateway
-
-Steps are automatically uploaded when you stop or pause the treadmill (minimum 10 steps).
+1. Build in Xcode: **Product → Archive**
+2. In the Organizer: **Distribute App → Copy App**
+3. Zip the `.app` bundle
+4. Go to GitHub → Releases → **Create a new release**
+5. Create a new tag (e.g., `v0.1.0`), write release notes
+6. Attach the zip file
+7. Publish
 
 ## Project Structure
 
 ```
 walkingpad-client/
-├── walkingpad_clientApp.swift     # App entry point + AppDelegate
-├── models/                        # Data types (DeviceState, Change, WorkoutSaveData)
+├── walkingpad_clientApp.swift       # App entry point + AppDelegate
+├── models/                          # Data types
+│   ├── DeviceState.swift            # BLE state snapshot
+│   └── WorkoutsSaveData.swift       # Persistence models + SessionSaveData
 ├── services/
 │   ├── walkingPad/
-│   │   ├── WalkingPadService.swift    # BLE state + notification parsing
-│   │   └── WalkingPadCommand.swift    # BLE write commands
+│   │   ├── WalkingPadService.swift  # BLE state + notification parsing
+│   │   └── WalkingPadCommand.swift  # BLE write commands
 │   ├── BluetoothDiscoveryService.swift
 │   ├── BluetoothPeripheral.swift
-│   ├── Workout.swift              # Step accumulation + persistence
-│   ├── HttpApi.swift              # Local HTTP server (port 4934)
-│   ├── MqttService.swift          # MQTT publishing
-│   ├── HCGatewayService.swift     # Health sync auth + orchestration
-│   ├── HCGatewayFacade.swift      # HCGateway REST client
-│   ├── StepsUploader.swift        # Batched step upload trigger
-│   ├── FileSystem.swift           # JSON file persistence
-│   └── RepeatingTimer.swift       # Polling timer
-├── views/                         # SwiftUI views
-└── utils/                         # Date extension helper
+│   ├── Workout.swift                # Session tracking + daily accumulation
+│   ├── NotionService.swift          # Notion API client + Day Totals
+│   ├── StravaService.swift          # Strava OAuth + activity posting
+│   ├── StravaOAuthServer.swift      # Temporary OAuth callback server
+│   ├── ActivityLog.swift            # Shared log for sync operations
+│   ├── HttpApi.swift                # Local HTTP server (port 4934)
+│   ├── MqttService.swift            # MQTT publishing
+│   ├── FileSystem.swift             # JSON file persistence
+│   └── RepeatingTimer.swift         # Polling timer
+├── viewmodels/
+│   └── StatsViewModel.swift         # Stats computation + filtering
+├── views/
+│   ├── ContentView.swift            # Root popover view
+│   ├── DeviceView.swift             # Connected device routing
+│   ├── RunningView.swift            # Speed slider + controls
+│   ├── StoppedOrPauseView.swift     # Start button
+│   ├── WorkoutStateView.swift       # Session distance/steps/time
+│   ├── FooterView.swift             # Stats, Strava, Quit buttons
+│   ├── WaitingForTreadmillView.swift
+│   ├── EmptyView.swift
+│   └── stats/
+│       ├── StatsWindowView.swift    # Stats dashboard layout
+│       ├── DailyDistanceChart.swift # Bar chart
+│       ├── ActivityHeatmap.swift    # Consistency streak
+│       ├── DebugView.swift          # Debug panel tabs
+│       └── ActivityLogTabView.swift # Live activity log
+└── utils/
+    └── DateExtension.swift
 ```
-
-For detailed technical documentation, see [ARCHITECTURE.md](ARCHITECTURE.md).
-For known bugs and improvement areas, see [KNOWN_ISSUES.md](KNOWN_ISSUES.md).
 
 ## Credits
 
-The BLE protocol implementation is inspired by [ph4r05/ph4-walkingpad](https://github.com/ph4r05/ph4-walkingpad).
+This project is a fork of [klassm/walkingpad_macos_client](https://github.com/klassm/walkingpad_macos_client) by Matthias Klass, which provided the original BLE protocol implementation and app structure. The BLE protocol is based on [ph4r05/ph4-walkingpad](https://github.com/ph4r05/ph4-walkingpad).
 
 ## License
 
