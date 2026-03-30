@@ -83,22 +83,60 @@ struct DebugView: View {
 
             if let sessions = w.sessions, !sessions.isEmpty {
                 Divider().opacity(0.3)
+                Text("Sessions")
+                    .font(.caption2.weight(.semibold))
+                    .foregroundStyle(.tertiary)
                 ForEach(Array(sessions.enumerated()), id: \.offset) { i, s in
-                    HStack(spacing: 8) {
-                        Text("#\(i + 1)")
-                            .font(.caption2.weight(.medium))
-                            .foregroundStyle(.secondary)
-                        Text(s.startTime, format: .dateTime.hour().minute())
-                        Text("→")
-                            .foregroundStyle(.tertiary)
-                        Text(s.endTime, format: .dateTime.hour().minute())
-                        Spacer()
-                        Text("\(s.steps) steps")
-                        Text("\(s.distance) m")
+                    let duration = Int(s.endTime.timeIntervalSince(s.startTime))
+                    let minutes = duration / 60
+                    let seconds = duration % 60
+                    let distKm = Double(s.distance) / 1000.0
+
+                    VStack(alignment: .leading, spacing: 3) {
+                        HStack(spacing: 6) {
+                            Text("#\(i + 1)")
+                                .font(.caption2.weight(.bold))
+                                .foregroundStyle(.blue)
+                                .frame(width: 20)
+                            Text(s.startTime, format: .dateTime.hour().minute().second())
+                            Text("→")
+                                .foregroundStyle(.tertiary)
+                            Text(s.endTime, format: .dateTime.hour().minute().second())
+                            Spacer()
+                            Text("\(minutes)m \(seconds)s")
+                                .foregroundStyle(.primary)
+                        }
+                        HStack(spacing: 16) {
+                            HStack(spacing: 3) {
+                                Text("Steps:")
+                                    .foregroundStyle(.tertiary)
+                                Text("\(s.steps)")
+                            }
+                            HStack(spacing: 3) {
+                                Text("Dist:")
+                                    .foregroundStyle(.tertiary)
+                                Text(distKm >= 0.1 ? String(format: "%.2f km", distKm) : "\(s.distance) m")
+                            }
+                            if duration > 0 {
+                                HStack(spacing: 3) {
+                                    Text("Avg:")
+                                        .foregroundStyle(.tertiary)
+                                    let avgSpeed = (distKm / (Double(duration) / 3600.0))
+                                    Text(String(format: "%.1f km/h", avgSpeed))
+                                }
+                            }
+                        }
+                        .padding(.leading, 26)
                     }
                     .font(.caption.monospaced())
                     .foregroundStyle(.secondary)
+                    .padding(.vertical, 2)
                 }
+            } else {
+                Text("No session data (recorded before session tracking)")
+                    .font(.caption2)
+                    .foregroundStyle(.tertiary)
+                    .padding(.top, 2)
             }
         }
         .padding(10)
