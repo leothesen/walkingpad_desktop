@@ -96,10 +96,8 @@ class Workout: ObservableObject {
     }
     
     /// Zeroes daily counters if the date has changed since the last update.
-    /// Note: only compares day-of-month, not full date — see KNOWN_ISSUES.md #9.
     public func resetIfDateChanged() {
-        let now = Date()
-        if now.get(.day) != self.lastUpdateTime.get(.day) && self.steps > 0 {
+        if !Calendar.current.isDateInToday(self.lastUpdateTime) && self.steps > 0 {
             self.currentSessionStart = nil
             self.currentSessionSteps = 0
             self.currentSessionDistance = 0

@@ -1,9 +1,6 @@
 import Foundation
 
 /// Simple timer wrapper that fires a callback on a repeating interval on the main RunLoop.
-///
-/// Known issue: the `interval` parameter is accepted but ignored — the timer
-/// hardcodes 4 seconds in `start()`. See KNOWN_ISSUES.md #7.
 class RepeatingTimer {
     private var interval: TimeInterval;
     private var eventHandler: () -> Void;
@@ -21,7 +18,7 @@ class RepeatingTimer {
         }
         
         NSLog("Starting timer");
-        let newTimer = Timer.scheduledTimer(withTimeInterval: 4, repeats: true) { _ in
+        let newTimer = Timer.scheduledTimer(withTimeInterval: self.interval, repeats: true) { _ in
             self.eventHandler()
         }
         RunLoop.main.add(newTimer, forMode: .common)
