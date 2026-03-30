@@ -38,6 +38,10 @@
 		B200000800000000000000BB /* ActivityHeatmap.swift in Sources */ = {isa = PBXBuildFile; fileRef = B200000700000000000000BB /* ActivityHeatmap.swift */; };
 		C300000200000000000000CC /* DebugView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C300000100000000000000CC /* DebugView.swift */; };
 		D400000200000000000000DD /* NotionService.swift in Sources */ = {isa = PBXBuildFile; fileRef = D400000100000000000000DD /* NotionService.swift */; };
+		E500000200000000000000EE /* StravaService.swift in Sources */ = {isa = PBXBuildFile; fileRef = E500000100000000000000EE /* StravaService.swift */; };
+		E500000400000000000000EE /* StravaOAuthServer.swift in Sources */ = {isa = PBXBuildFile; fileRef = E500000300000000000000EE /* StravaOAuthServer.swift */; };
+		F600000200000000000000FF /* ActivityLog.swift in Sources */ = {isa = PBXBuildFile; fileRef = F600000100000000000000FF /* ActivityLog.swift */; };
+		G700000200000000000000GG /* ActivityLogTabView.swift in Sources */ = {isa = PBXBuildFile; fileRef = G700000100000000000000GG /* ActivityLogTabView.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -72,7 +76,11 @@
 		B200000500000000000000BB /* DailyDistanceChart.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DailyDistanceChart.swift; sourceTree = "<group>"; };
 		B200000700000000000000BB /* ActivityHeatmap.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ActivityHeatmap.swift; sourceTree = "<group>"; };
 		C300000100000000000000CC /* DebugView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DebugView.swift; sourceTree = "<group>"; };
+		G700000100000000000000GG /* ActivityLogTabView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ActivityLogTabView.swift; sourceTree = "<group>"; };
 		D400000100000000000000DD /* NotionService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NotionService.swift; sourceTree = "<group>"; };
+		E500000100000000000000EE /* StravaService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StravaService.swift; sourceTree = "<group>"; };
+		E500000300000000000000EE /* StravaOAuthServer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StravaOAuthServer.swift; sourceTree = "<group>"; };
+		F600000100000000000000FF /* ActivityLog.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ActivityLog.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -173,6 +181,9 @@
 				5B15903C2641BEEC0039C334 /* HttpApi.swift */,
 				A100000700000000000000AA /* MqttService.swift */,
 				D400000100000000000000DD /* NotionService.swift */,
+				E500000100000000000000EE /* StravaService.swift */,
+				E500000300000000000000EE /* StravaOAuthServer.swift */,
+				F600000100000000000000FF /* ActivityLog.swift */,
 				5B43D84D267F761700A16916 /* RepeatingTimer.swift */,
 				5BA17252263EDB0F0010E483 /* Workout.swift */,
 			);
@@ -202,6 +213,7 @@
 				B200000500000000000000BB /* DailyDistanceChart.swift */,
 				B200000700000000000000BB /* ActivityHeatmap.swift */,
 			C300000100000000000000CC /* DebugView.swift */,
+			G700000100000000000000GG /* ActivityLogTabView.swift */,
 			);
 			path = stats;
 			sourceTree = "<group>";
@@ -309,8 +321,12 @@
 			B200000400000000000000BB /* StatsWindowView.swift in Sources */,
 			B200000600000000000000BB /* DailyDistanceChart.swift in Sources */,
 			B200000800000000000000BB /* ActivityHeatmap.swift in Sources */,
-			C300000200000000000000CC /* DebugView.swift in Sources */,
+C300000200000000000000CC /* DebugView.swift in Sources */,
+			G700000200000000000000GG /* ActivityLogTabView.swift in Sources */,
 			D400000200000000000000DD /* NotionService.swift in Sources */,
+			E500000200000000000000EE /* StravaService.swift in Sources */,
+			E500000400000000000000EE /* StravaOAuthServer.swift in Sources */,
+			F600000200000000000000FF /* ActivityLog.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

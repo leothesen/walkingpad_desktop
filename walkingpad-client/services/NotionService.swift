@@ -33,10 +33,6 @@ class NotionService: ObservableObject {
         return f
     }()
 
-    init() {
-        loadConfig()
-    }
-
     private struct NotionConfig: Codable {
         var apiKey: String
         var databaseId: String
@@ -44,13 +40,18 @@ class NotionService: ObservableObject {
 
     private let configFilename = ".walkingpad-client-notion.json"
 
+    init() {
+        loadConfig()
+    }
+
     // MARK: - Config (JSON file)
 
     func saveConfig(apiKey: String, databaseId: String) {
         self.apiKey = apiKey
         self.databaseId = databaseId
         self.isConfigured = true
-        if let data = try? JSONEncoder().encode(NotionConfig(apiKey: apiKey, databaseId: databaseId)) {
+        let config = NotionConfig(apiKey: apiKey, databaseId: databaseId)
+        if let data = try? JSONEncoder().encode(config) {
             FileSystem().save(filename: configFilename, data: data)
         }
     }
@@ -318,6 +319,122 @@ class NotionService: ObservableObject {
         return formatter.date(from: combined)
     }
 
+    // MARK: - Day Totals
+
+    private let dayTotalsDatabaseId = "333deabd-9164-80fb-b3e6-e6292f0a9826"
+
+    /// Check if a Day Totals entry exists for a date and if Strava was posted.
+    func fetchDayTotal(for date: Date) async -> (exists: Bool, stravaPosted: Bool, pageId: String?)? {
+        guard let apiKey = apiKey else { return nil }
+
+        let dateStr = Self.dateFormatter.string(from: date)
+        let body: [String: Any] = [
+            "page_size": 1,
+            "filter": ["property": "Date", "date": ["equals": dateStr]]
+        ]
+
+        do {
+            var request = URLRequest(url: URL(string: "\(baseURL)/databases/\(dayTotalsDatabaseId)/query")!)
+            request.httpMethod = "POST"
+            request.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
+            request.setValue(notionVersion, forHTTPHeaderField: "Notion-Version")
+            request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+            request.httpBody = try JSONSerialization.data(withJSONObject: body)
+
+            let (data, response) = try await session.data(for: request)
+            guard (response as? HTTPURLResponse)?.statusCode == 200,
+                  let json = try JSONSerialization.jsonObject(with: data) as? [String: Any],
+                  let results = json["results"] as? [[String: Any]] else { return nil }
+
+            if let page = results.first {
+                let props = page["properties"] as? [String: Any] ?? [:]
+                let stravaPostedAt = extractRichText(props["Strava Posted At"])
+                let pageId = page["id"] as? String
+                return (exists: true, stravaPosted: !stravaPostedAt.isEmpty, pageId: pageId)
+            }
+            return (exists: false, stravaPosted: false, pageId: nil)
+        } catch {
+            print("Notion: fetchDayTotal error: \(error)")
+            return nil
+        }
+    }
+
+    /// Create or update the Day Totals entry for today.
+    func upsertDayTotal(date: Date, sessions: [SessionSaveData], stravaActivityId: String? = nil) async -> Bool {
+        guard let apiKey = apiKey else { return false }
+
+        let totalDistance = sessions.reduce(0) { $0 + $1.distance }
+        let totalSteps = sessions.reduce(0) { $0 + $1.steps }
+        let totalSeconds = sessions.reduce(0) { $0 + Int($1.endTime.timeIntervalSince($1.startTime)) }
+        let durationMin = round(Double(totalSeconds) / 6.0) / 10.0
+        let dateStr = Self.dateFormatter.string(from: date)
+        let distKm = Double(totalDistance) / 1000.0
+
+        var properties: [String: Any] = [
+            "Day": ["title": [["text": ["content": "\(String(format: "%.1f", distKm))km — \(dateStr)"]]]],
+            "Date": ["date": ["start": dateStr]],
+            "Total Distance (m)": ["number": totalDistance],
+            "Total Steps": ["number": totalSteps],
+            "Total Duration (min)": ["number": durationMin],
+            "Sessions": ["number": sessions.count]
+        ]
+
+        if let activityId = stravaActivityId {
+            let timeFormatter = DateFormatter()
+            timeFormatter.dateFormat = "HH:mm:ss"
+            properties["Strava Posted At"] = ["rich_text": [["text": ["content": timeFormatter.string(from: Date())]]]]
+            properties["Strava Activity ID"] = ["rich_text": [["text": ["content": activityId]]]]
+        }
+
+        // Check if entry exists
+        if let existing = await fetchDayTotal(for: date), existing.exists, let pageId = existing.pageId {
+            // Update existing
+            do {
+                var request = URLRequest(url: URL(string: "\(baseURL)/pages/\(pageId)")!)
+                request.httpMethod = "PATCH"
+                request.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
+                request.setValue(notionVersion, forHTTPHeaderField: "Notion-Version")
+                request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+                request.httpBody = try JSONSerialization.data(withJSONObject: ["properties": properties])
+
+                let (_, response) = try await session.data(for: request)
+                let success = (response as? HTTPURLResponse)?.statusCode == 200
+                print("Notion: day total updated: \(success)")
+                return success
+            } catch {
+                print("Notion: day total update error: \(error)")
+                return false
+            }
+        } else {
+            // Create new
+            let body: [String: Any] = [
+                "parent": ["database_id": dayTotalsDatabaseId],
+                "properties": properties
+            ]
+            do {
+                var request = URLRequest(url: URL(string: "\(baseURL)/pages")!)
+                request.httpMethod = "POST"
+                request.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
+                request.setValue(notionVersion, forHTTPHeaderField: "Notion-Version")
+                request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+                request.httpBody = try JSONSerialization.data(withJSONObject: body)
+
+                let (_, response) = try await session.data(for: request)
+                let success = (response as? HTTPURLResponse)?.statusCode == 200
+                print("Notion: day total created: \(success)")
+                return success
+            } catch {
+                print("Notion: day total create error: \(error)")
+                return false
+            }
+        }
+    }
+
+    /// Check if Strava has been posted for a given date (via Day Totals).
+    func isStravaPosted(for date: Date) async -> Bool {
+        guard let result = await fetchDayTotal(for: date) else { return false }
+        return result.stravaPosted
+    }
 }
 
 // MARK: - Grouping Sessions by Date
