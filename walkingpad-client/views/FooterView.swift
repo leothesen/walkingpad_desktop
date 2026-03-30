@@ -14,6 +14,7 @@ struct FooterView: View {
             Button(action: { openStatsWindow() }) {
                 Label("Stats", systemImage: "chart.bar")
                     .font(.caption2.weight(.medium))
+                    .contentShape(Capsule())
             }
             .buttonStyle(.plain)
             .padding(.horizontal, 8)
@@ -30,6 +31,7 @@ struct FooterView: View {
                 Text("Quit")
                     .font(.caption2.weight(.medium))
                     .foregroundStyle(.secondary)
+                    .contentShape(Capsule())
             }
             .buttonStyle(.plain)
             .padding(.horizontal, 8)

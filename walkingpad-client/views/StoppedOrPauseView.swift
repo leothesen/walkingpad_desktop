@@ -15,6 +15,7 @@ struct StoppedOrPausedView: View {
                     .font(.caption.weight(.semibold))
                     .foregroundStyle(.green)
                     .frame(maxWidth: .infinity)
+                    .contentShape(Capsule())
             }
             .buttonStyle(.plain)
             .padding(.vertical, 4)

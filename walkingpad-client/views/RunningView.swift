@@ -52,6 +52,7 @@ struct RunningView: View {
                     .font(.caption.weight(.semibold))
                     .foregroundStyle(.red)
                     .frame(maxWidth: .infinity)
+                    .contentShape(Capsule())
             }
             .buttonStyle(.plain)
             .padding(.vertical, 4)
@@ -72,6 +73,7 @@ struct RunningView: View {
             Text(mode == .manual ? "Manual" : "Auto")
                 .font(.caption2.weight(.medium))
                 .frame(maxWidth: .infinity)
+                .contentShape(Capsule())
         }
         .buttonStyle(.plain)
         .padding(.vertical, 4)
