@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// Bottom bar with Stats, Login/Logout, and Quit buttons.
+/// Bottom bar with Stats and Quit buttons, pinned to the bottom of the popover.
 /// Warning: Quit uses exit(0) which bypasses cleanup — see KNOWN_ISSUES.md #8.
 struct FooterView: View {
     @EnvironmentObject var walkingPadService: WalkingPadService
@@ -11,7 +11,6 @@ struct FooterView: View {
 
     var body: some View {
         HStack(spacing: 8) {
-            Spacer()
             Button(action: { openStatsWindow() }) {
                 Text("Stats")
                     .font(.caption.weight(.medium))
@@ -21,7 +20,7 @@ struct FooterView: View {
             .padding(.vertical, 4)
             .glassEffect(.regular.interactive(), in: .capsule)
 
-            LoginLogoutButton()
+            Spacer()
 
             Button(action: {
                 walkingPadService.command()?.setSpeed(speed: 0)

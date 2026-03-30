@@ -113,7 +113,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                                     .environmentObject(hcGatewayService))
         let menuItem = NSMenuItem()
         menuItem.view = view
-        view.frame = NSRect(x: 0, y: 0, width: 200, height: 250)
+        view.frame = NSRect(x: 0, y: 0, width: 220, height: 310)
 
         let menu = NSMenu()
         menu.addItem(menuItem)

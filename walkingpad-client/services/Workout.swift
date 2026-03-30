@@ -74,14 +74,19 @@ class Workout: ObservableObject {
     public func update(_ oldState: DeviceState?, _ newState: DeviceState) {
         self.resetIfDateChanged()
 
-        let stepDiff = newState.steps - (oldState?.steps ?? 0)
-        let distanceDiff = newState.distance - (oldState?.distance ?? 0)
-        let walkingTimeDiff = newState.walkingTimeSeconds - ( oldState?.walkingTimeSeconds ?? 0)
+        // Skip the first update after connection — oldState is nil so we can't compute
+        // a meaningful diff (newState contains the treadmill's cumulative counters since power-on).
+        guard let oldState = oldState else { return }
 
-        if ((self.steps > 0 && oldState == nil) || stepDiff < 0 || distanceDiff < 0) {
+        let stepDiff = newState.steps - oldState.steps
+        let distanceDiff = newState.distance - oldState.distance
+        let walkingTimeDiff = newState.walkingTimeSeconds - oldState.walkingTimeSeconds
+
+        // Guard against negative diffs (treadmill counter reset)
+        if stepDiff < 0 || distanceDiff < 0 {
             return
         }
-        if (oldState != nil && oldState?.speed != newState.speed) {
+        if oldState.speed != newState.speed {
             save()
         }
 
@@ -92,14 +97,14 @@ class Workout: ObservableObject {
                 oldTime: self.lastUpdateTime,
                 newTime: newState.time,
                 stepsDiff: stepDiff,
-                oldSpeed: oldState?.speed ?? 0,
+                oldSpeed: oldState.speed,
                 newSpeed: newState.speed
             )
             self.onChangeCallback(change)
         }
 
         // Session tracking (non-published state, safe to update synchronously)
-        let wasWalking = (oldState?.speed ?? 0) > 0
+        let wasWalking = oldState.speed > 0
         let isWalking = newState.speed > 0
 
         if isWalking && !wasWalking {
