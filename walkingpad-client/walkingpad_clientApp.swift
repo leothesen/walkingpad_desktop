@@ -49,6 +49,11 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             self.walkingPadService.command()?.updateStatus()
         })
 
+        // Slow treadmill when duration limit is hit
+        workout.onSpeedNudge = { [weak self] speed in
+            self?.walkingPadService.command()?.setSpeed(speed: speed)
+        }
+
         // Push completed sessions to Notion, then fetch today's total for status bar
         workout.onSessionComplete = { [weak self] session, sessionNumber in
             guard let self = self, self.notionService.isConfigured else { return }

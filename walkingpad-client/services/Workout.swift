@@ -61,6 +61,9 @@ class Workout: ObservableObject {
 
     /// Called when a session completes (speed → 0). Used to push to Notion.
     public var onSessionComplete: ((SessionSaveData, Int) -> Void)? = nil
+
+    /// Called when the duration limit is hit. Passes the target speed (raw, tenths of km/h).
+    public var onSpeedNudge: ((UInt8) -> Void)? = nil
     
     init() {
         self.load()
@@ -86,7 +89,10 @@ class Workout: ObservableObject {
             trigger: nil
         )
         UNUserNotificationCenter.current().add(request)
-        print("60-min walking notification sent")
+        print("60-min walking notification sent, reducing speed to 1.5 km/h")
+
+        // Nudge: slow the treadmill to 1.5 km/h to encourage stopping
+        onSpeedNudge?(15)
     }
     
     /// Zeroes daily counters if the date has changed since the last update.
