@@ -7,6 +7,7 @@ struct RunningView: View {
 
     @State private var sliderSpeed: Double = 0
     @State private var isDragging: Bool = false
+    @State private var showFinishConfirm: Bool = false
 
     var body: some View {
         let state = walkingPadService.lastStatus()
@@ -78,16 +79,48 @@ struct RunningView: View {
             .padding(.vertical, 4)
             .glassEffect(.regular.tint(.red.opacity(0.1)).interactive(), in: .capsule)
 
-            Button(action: { stopAndFinishDay() }) {
-                Text("Stop & Finish Day")
-                    .font(.caption2.weight(.medium))
-                    .foregroundStyle(.orange)
-                    .frame(maxWidth: .infinity)
-                    .contentShape(Capsule())
+            if showFinishConfirm {
+                HStack(spacing: 6) {
+                    Text("Post to Strava?")
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                    Spacer()
+                    Button(action: { showFinishConfirm = false }) {
+                        Text("No")
+                            .font(.caption2.weight(.medium))
+                            .frame(width: 40)
+                            .contentShape(Capsule())
+                    }
+                    .buttonStyle(.plain)
+                    .padding(.vertical, 3)
+                    .glassEffect(.regular.interactive(), in: .capsule)
+
+                    Button(action: {
+                        showFinishConfirm = false
+                        stopAndFinishDay()
+                    }) {
+                        Text("Yes")
+                            .font(.caption2.weight(.medium))
+                            .foregroundStyle(.orange)
+                            .frame(width: 40)
+                            .contentShape(Capsule())
+                    }
+                    .buttonStyle(.plain)
+                    .padding(.vertical, 3)
+                    .glassEffect(.regular.tint(.orange.opacity(0.1)).interactive(), in: .capsule)
+                }
+            } else {
+                Button(action: { showFinishConfirm = true }) {
+                    Text("Stop & Finish Day")
+                        .font(.caption2.weight(.medium))
+                        .foregroundStyle(.orange)
+                        .frame(maxWidth: .infinity)
+                        .contentShape(Capsule())
+                }
+                .buttonStyle(.plain)
+                .padding(.vertical, 3)
+                .glassEffect(.regular.tint(.orange.opacity(0.1)).interactive(), in: .capsule)
             }
-            .buttonStyle(.plain)
-            .padding(.vertical, 3)
-            .glassEffect(.regular.tint(.orange.opacity(0.1)).interactive(), in: .capsule)
         }
         .onAppear { sliderSpeed = max(currentSpeed, 0.5) }
         .onChange(of: state?.speed) { _, newSpeed in
