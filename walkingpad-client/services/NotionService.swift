@@ -1,5 +1,4 @@
 import Foundation
-import Security
 
 /// Notion API client for syncing walking sessions to a Notion database.
 /// Handles Keychain-based config storage, pushing sessions, and fetching all sessions.
@@ -38,28 +37,40 @@ class NotionService: ObservableObject {
         loadConfig()
     }
 
-    // MARK: - Config (Keychain)
+    private struct NotionConfig: Codable {
+        var apiKey: String
+        var databaseId: String
+    }
+
+    private let configFilename = ".walkingpad-client-notion.json"
+
+    // MARK: - Config (JSON file)
 
     func saveConfig(apiKey: String, databaseId: String) {
-        saveKeychain(key: apiKeyKeychainKey, value: apiKey)
-        saveKeychain(key: databaseIdKeychainKey, value: databaseId)
         self.apiKey = apiKey
         self.databaseId = databaseId
         self.isConfigured = true
+        if let data = try? JSONEncoder().encode(NotionConfig(apiKey: apiKey, databaseId: databaseId)) {
+            FileSystem().save(filename: configFilename, data: data)
+        }
     }
 
     func clearConfig() {
-        deleteKeychain(key: apiKeyKeychainKey)
-        deleteKeychain(key: databaseIdKeychainKey)
         self.apiKey = nil
         self.databaseId = nil
         self.isConfigured = false
+        FileSystem().save(filename: configFilename, data: Data("{}".utf8))
     }
 
     func loadConfig() {
-        self.apiKey = loadKeychain(key: apiKeyKeychainKey)
-        self.databaseId = loadKeychain(key: databaseIdKeychainKey)
-        self.isConfigured = apiKey != nil && databaseId != nil
+        guard let data = FileSystem().load(filename: configFilename),
+              let config = try? JSONDecoder().decode(NotionConfig.self, from: data) else {
+            self.isConfigured = false
+            return
+        }
+        self.apiKey = config.apiKey
+        self.databaseId = config.databaseId
+        self.isConfigured = !config.apiKey.isEmpty && !config.databaseId.isEmpty
     }
 
     func currentDatabaseId() -> String? {
@@ -307,43 +318,6 @@ class NotionService: ObservableObject {
         return formatter.date(from: combined)
     }
 
-    // MARK: - Keychain Helpers
-
-    private func saveKeychain(key: String, value: String) {
-        let query: [String: Any] = [
-            kSecClass as String: kSecClassGenericPassword,
-            kSecAttrService as String: "com.walkingpad.notion",
-            kSecAttrAccount as String: key,
-            kSecValueData as String: value.data(using: .utf8)!
-        ]
-        SecItemDelete(query as CFDictionary)
-        SecItemAdd(query as CFDictionary, nil)
-    }
-
-    private func loadKeychain(key: String) -> String? {
-        let query: [String: Any] = [
-            kSecClass as String: kSecClassGenericPassword,
-            kSecAttrService as String: "com.walkingpad.notion",
-            kSecAttrAccount as String: key,
-            kSecReturnData as String: true,
-            kSecMatchLimit as String: kSecMatchLimitOne
-        ]
-        var ref: AnyObject?
-        let status = SecItemCopyMatching(query as CFDictionary, &ref)
-        if status == errSecSuccess, let data = ref as? Data {
-            return String(data: data, encoding: .utf8)
-        }
-        return nil
-    }
-
-    private func deleteKeychain(key: String) {
-        let query: [String: Any] = [
-            kSecClass as String: kSecClassGenericPassword,
-            kSecAttrService as String: "com.walkingpad.notion",
-            kSecAttrAccount as String: key
-        ]
-        SecItemDelete(query as CFDictionary)
-    }
 }
 
 // MARK: - Grouping Sessions by Date

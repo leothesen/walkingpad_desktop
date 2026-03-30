@@ -1,4 +1,5 @@
 import SwiftUI
+import UserNotifications
 
 /// Main app entry point. Uses a Settings scene with an empty view since this is a
 /// menu-bar-only app (LSUIElement = true in Info.plist hides it from the Dock).
@@ -115,6 +116,11 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
     /// Sets up the status bar menu item, starts the HTTP API server, and fetches today's stats.
     func applicationDidFinishLaunching(_ aNotification: Notification) {
+        // Request notification permissions
+        UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound]) { granted, _ in
+            print("Notification permission \(granted ? "granted" : "denied")")
+        }
+
         // HTTP server runs on a background thread (blocks with loop.runForever())
         DispatchQueue.global(qos: .userInitiated).async {
             startHttpServer(walkingPadService: self.walkingPadService, workout: self.workout)
