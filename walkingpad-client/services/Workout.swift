@@ -74,7 +74,7 @@ class Workout: ObservableObject {
     private func sendWalkingDurationNotificationIfNeeded() {
         guard let start = currentSessionStart, !hasNotifiedForCurrentSession else { return }
         let elapsed = Date().timeIntervalSince(start)
-        guard elapsed >= 60 else { return } // TODO: change back to 3600 after testing
+        guard elapsed >= 3600 else { return }
 
         hasNotifiedForCurrentSession = true
 
