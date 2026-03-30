@@ -5,6 +5,7 @@ enum DebugTab: String, CaseIterable {
     case bleConsole = "BLE Console"
     case storage = "Storage"
     case notion = "Notion"
+    case strava = "Strava"
 }
 
 /// Debug panel showing raw workout JSON, live BLE log, storage info, and Notion config.
@@ -12,6 +13,7 @@ struct DebugView: View {
     let workouts: [WorkoutSaveData]
     @ObservedObject var walkingPadService: WalkingPadService
     @ObservedObject var notionService: NotionService
+    @ObservedObject var stravaService: StravaService
     @State private var selectedTab: DebugTab = .rawData
 
     private static let timeFormatter: DateFormatter = {
@@ -41,7 +43,121 @@ struct DebugView: View {
                 storageTab
             case .notion:
                 notionTab
+            case .strava:
+                stravaTab
             }
+        }
+    }
+
+    // MARK: - Strava Tab
+
+    @State private var stravaClientId: String = ""
+    @State private var stravaClientSecret: String = ""
+
+    private var stravaTab: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 12) {
+                // API Credentials
+                if !stravaService.isClientConfigured {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("API Credentials")
+                            .font(.caption.weight(.semibold))
+                        Text("Register at strava.com/settings/api")
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
+
+                        Text("Client ID")
+                            .font(.caption2).foregroundStyle(.tertiary)
+                        TextField("Client ID", text: $stravaClientId)
+                            .textFieldStyle(.roundedBorder)
+                            .font(.caption.monospaced())
+
+                        Text("Client Secret")
+                            .font(.caption2).foregroundStyle(.tertiary)
+                        SecureField("Client Secret", text: $stravaClientSecret)
+                            .textFieldStyle(.roundedBorder)
+                            .font(.caption.monospaced())
+
+                        Button("Save Credentials") {
+                            stravaService.saveClientConfig(clientId: stravaClientId, clientSecret: stravaClientSecret)
+                            stravaClientId = ""
+                            stravaClientSecret = ""
+                        }
+                        .font(.caption)
+                        .disabled(stravaClientId.isEmpty || stravaClientSecret.isEmpty)
+                    }
+                    .padding(10)
+                    .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 8))
+                } else {
+                    HStack {
+                        Image(systemName: "checkmark.circle.fill")
+                            .foregroundStyle(.green)
+                        Text("API credentials configured")
+                            .font(.caption)
+                        Spacer()
+                        Button("Clear") {
+                            stravaService.clearClientConfig()
+                        }
+                        .font(.caption2)
+                        .foregroundStyle(.red)
+                    }
+                }
+
+                // Connection status
+                HStack {
+                    Image(systemName: stravaService.isConnected ? "checkmark.circle.fill" : "xmark.circle")
+                        .foregroundStyle(stravaService.isConnected ? .green : .secondary)
+                    Text(stravaService.isConnected ? "Connected to Strava" : "Not connected")
+                        .font(.callout.weight(.medium))
+                }
+                .padding(10)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 8))
+
+                // Sync state
+                HStack {
+                    Text("Synced today:")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    Text(stravaService.isSyncedToday ? "Yes" : "No")
+                        .font(.caption.weight(.medium))
+                        .foregroundStyle(stravaService.isSyncedToday ? .green : .orange)
+                }
+
+                if let error = stravaService.lastError {
+                    Text("Last error: \(error)")
+                        .font(.caption)
+                        .foregroundStyle(.red)
+                }
+
+                // Actions
+                HStack(spacing: 8) {
+                    if stravaService.isClientConfigured && !stravaService.isConnected {
+                        Button("Connect to Strava") {
+                            stravaService.startOAuthFlow()
+                        }
+                    }
+                    if stravaService.isConnected {
+                        Button("Disconnect") {
+                            stravaService.disconnect()
+                        }
+                        .foregroundStyle(.red)
+                    }
+                }
+                .font(.caption)
+
+                // Synced dates
+                let syncedDates = UserDefaults.standard.stringArray(forKey: "stravaSyncedDates") ?? []
+                if !syncedDates.isEmpty {
+                    Text("Synced dates:")
+                        .font(.caption2)
+                        .foregroundStyle(.tertiary)
+                    Text(syncedDates.suffix(10).joined(separator: ", "))
+                        .font(.caption.monospaced())
+                        .foregroundStyle(.secondary)
+                }
+            }
+            .padding(12)
         }
     }
 
