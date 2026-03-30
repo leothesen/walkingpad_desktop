@@ -1,50 +1,43 @@
 import SwiftUI
 import CoreBluetooth
 
-/// Formats a distance value for display. Shows meters below 10km, km above.
-/// Note: threshold is 10,000m (10km) rather than the more common 1,000m — see KNOWN_ISSUES.md #15.
+/// Formats a distance value for display. Switches to km at 1000m.
 func distanceTextFor(_ meters: Int) -> String {
-    if (meters < 10000) {
+    if meters < 1000 {
         return "\(meters) m"
     }
-    return String(format: "%.00f km", Double(meters) / 1000)
-}
-
-
-func stepsTextFor(_ steps: Int) -> String {
-    return String(steps)
+    return String(format: "%.2f km", Double(meters) / 1000)
 }
 
 func formatTime(_ seconds: Int) -> String {
     let formatter = DateComponentsFormatter()
     formatter.allowedUnits = [.hour, .minute, .second]
     formatter.unitsStyle = .abbreviated
-
     return formatter.string(from: TimeInterval(seconds)) ?? ""
-    
 }
 
-
 struct WorkoutStateView: View {
-    @EnvironmentObject
-    var workout: Workout
-
-    @EnvironmentObject
-    var walkingPadService: WalkingPadService
+    @EnvironmentObject var workout: Workout
+    @EnvironmentObject var walkingPadService: WalkingPadService
 
     var body: some View {
-        let statusSeconds = walkingPadService.lastStatus()?.walkingTimeSeconds ?? 0
-        VStack(spacing: 2) {
-            Text("\(distanceTextFor(workout.distance))")
-                .font(.title2.weight(.semibold))
-            HStack(spacing: 8) {
-                Text("\(workout.steps) steps")
-                Text("\(formatTime(workout.walkingSeconds))")
+        VStack(spacing: 1) {
+            Text(distanceTextFor(workout.distance))
+                .font(.system(size: 20, weight: .semibold, design: .rounded))
+            HStack(spacing: 4) {
+                Image(systemName: "figure.walk")
+                    .font(.system(size: 9))
+                    .foregroundStyle(.tertiary)
+                Text("\(workout.steps)")
+                Text("·")
+                    .foregroundStyle(.quaternary)
+                Text(formatTime(workout.walkingSeconds))
             }
-            .font(.caption)
+            .font(.caption2)
             .foregroundStyle(.secondary)
         }
-        .padding(10)
-        .glassEffect(.regular, in: .rect(cornerRadius: 12))
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 6)
+        .glassEffect(.regular, in: .rect(cornerRadius: 10))
     }
 }

@@ -10,14 +10,14 @@ struct FooterView: View {
     private static var statsWindow: NSWindow?
 
     var body: some View {
-        HStack(spacing: 8) {
+        HStack(spacing: 6) {
             Button(action: { openStatsWindow() }) {
-                Text("Stats")
-                    .font(.caption.weight(.medium))
+                Label("Stats", systemImage: "chart.bar")
+                    .font(.caption2.weight(.medium))
             }
             .buttonStyle(.plain)
             .padding(.horizontal, 8)
-            .padding(.vertical, 4)
+            .padding(.vertical, 3)
             .glassEffect(.regular.interactive(), in: .capsule)
 
             Spacer()
@@ -28,11 +28,12 @@ struct FooterView: View {
                 exit(0)
             }) {
                 Text("Quit")
-                    .font(.caption.weight(.medium))
+                    .font(.caption2.weight(.medium))
+                    .foregroundStyle(.secondary)
             }
             .buttonStyle(.plain)
             .padding(.horizontal, 8)
-            .padding(.vertical, 4)
+            .padding(.vertical, 3)
             .glassEffect(.regular.interactive(), in: .capsule)
         }
     }

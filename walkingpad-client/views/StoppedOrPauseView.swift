@@ -2,25 +2,23 @@ import SwiftUI
 import CoreBluetooth
 
 struct StoppedOrPausedView: View {
-
-    @EnvironmentObject
-    var walkingPadService: WalkingPadService
+    @EnvironmentObject var walkingPadService: WalkingPadService
 
     var body: some View {
-        VStack(spacing: 10) {
+        VStack(spacing: 6) {
             WorkoutStateView()
 
             Button(action: {
-                self.walkingPadService.command()?.start()
+                walkingPadService.command()?.start()
             }) {
                 Text("Start")
-                    .font(.body.weight(.semibold))
+                    .font(.caption.weight(.semibold))
                     .foregroundStyle(.green)
                     .frame(maxWidth: .infinity)
             }
             .buttonStyle(.plain)
-            .padding(.vertical, 6)
-            .glassEffect(.regular.tint(.green.opacity(0.15)).interactive(), in: .capsule)
+            .padding(.vertical, 4)
+            .glassEffect(.regular.tint(.green.opacity(0.1)).interactive(), in: .capsule)
         }
     }
 }
