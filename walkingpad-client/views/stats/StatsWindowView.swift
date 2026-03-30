@@ -7,6 +7,7 @@ struct StatsWindowView: View {
     @StateObject var viewModel: StatsViewModel
     var walkingPadService: WalkingPadService?
     var notionService: NotionService
+    var stravaService: StravaService
     @State private var showDebug = false
     @State private var hoverFraction: CGFloat = 0.5
 
@@ -64,7 +65,8 @@ struct StatsWindowView: View {
                     DebugView(
                         workouts: viewModel.allWorkouts,
                         walkingPadService: service,
-                        notionService: notionService
+                        notionService: notionService,
+                        stravaService: stravaService
                     )
                     .frame(minHeight: 200)
                     .transition(.move(edge: .bottom).combined(with: .opacity))

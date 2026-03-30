@@ -11,6 +11,13 @@ struct FooterView: View {
     /// Cached NotionService to avoid repeated Keychain reads.
     private static var _notionService: NotionService?
 
+    private var stravaService: StravaService {
+        if let appDelegate = NSApp.delegate as? AppDelegate {
+            return appDelegate.stravaService
+        }
+        return StravaService()
+    }
+
     var body: some View {
         HStack(spacing: 6) {
             Button(action: { openStatsWindow() }) {
@@ -22,6 +29,8 @@ struct FooterView: View {
             .padding(.horizontal, 8)
             .padding(.vertical, 3)
             .glassEffect(.regular.interactive(), in: .capsule)
+
+            stravaButton
 
             Spacer()
 
@@ -39,6 +48,67 @@ struct FooterView: View {
             .padding(.horizontal, 8)
             .padding(.vertical, 3)
             .glassEffect(.regular.interactive(), in: .capsule)
+        }
+    }
+
+    @ViewBuilder
+    private var stravaButton: some View {
+        let strava = stravaService
+        if strava.isSyncing {
+            ProgressView()
+                .controlSize(.mini)
+                .padding(.horizontal, 6)
+        } else if !strava.isConnected {
+            Button(action: { strava.startOAuthFlow() }) {
+                Image(systemName: "figure.run")
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+                    .contentShape(Capsule())
+            }
+            .buttonStyle(.plain)
+            .padding(.horizontal, 6)
+            .padding(.vertical, 3)
+            .glassEffect(.regular.interactive(), in: .capsule)
+            .help("Connect to Strava")
+        } else if strava.isSyncedToday {
+            Image(systemName: "checkmark.circle.fill")
+                .font(.caption2)
+                .foregroundStyle(.green)
+                .help("Synced to Strava today")
+        } else if strava.lastError != nil {
+            Button(action: { postToStrava() }) {
+                Image(systemName: "exclamationmark.circle")
+                    .font(.caption2)
+                    .foregroundStyle(.red)
+                    .contentShape(Capsule())
+            }
+            .buttonStyle(.plain)
+            .padding(.horizontal, 6)
+            .padding(.vertical, 3)
+            .glassEffect(.regular.interactive(), in: .capsule)
+            .help(strava.lastError ?? "Error")
+        } else {
+            Button(action: { postToStrava() }) {
+                Image(systemName: "square.and.arrow.up")
+                    .font(.caption2)
+                    .foregroundStyle(.orange)
+                    .contentShape(Capsule())
+            }
+            .buttonStyle(.plain)
+            .padding(.horizontal, 6)
+            .padding(.vertical, 3)
+            .glassEffect(.regular.interactive(), in: .capsule)
+            .help("Post today's walk to Strava")
+        }
+    }
+
+    private func postToStrava() {
+        let strava = stravaService
+        let notion = notionService
+        Task {
+            if let sessions = await notion.fetchTodaySessions(), !sessions.isEmpty {
+                await strava.postTodayActivity(sessions: sessions, notionService: notion)
+            }
         }
     }
 
@@ -75,7 +145,8 @@ struct FooterView: View {
         let statsView = StatsWindowView(
             viewModel: viewModel,
             walkingPadService: walkingPadService,
-            notionService: notion
+            notionService: notion,
+            stravaService: stravaService
         )
         let hostingView = NSHostingView(rootView: statsView)
 

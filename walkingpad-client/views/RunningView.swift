@@ -7,6 +7,7 @@ struct RunningView: View {
 
     @State private var sliderSpeed: Double = 0
     @State private var isDragging: Bool = false
+    @State private var showFinishConfirm: Bool = false
 
     var body: some View {
         let state = walkingPadService.lastStatus()
@@ -77,6 +78,49 @@ struct RunningView: View {
             .buttonStyle(.plain)
             .padding(.vertical, 4)
             .glassEffect(.regular.tint(.red.opacity(0.1)).interactive(), in: .capsule)
+
+            if showFinishConfirm {
+                HStack(spacing: 6) {
+                    Text("Post to Strava?")
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                    Spacer()
+                    Button(action: { showFinishConfirm = false }) {
+                        Text("No")
+                            .font(.caption2.weight(.medium))
+                            .frame(width: 40)
+                            .contentShape(Capsule())
+                    }
+                    .buttonStyle(.plain)
+                    .padding(.vertical, 3)
+                    .glassEffect(.regular.interactive(), in: .capsule)
+
+                    Button(action: {
+                        showFinishConfirm = false
+                        stopAndFinishDay()
+                    }) {
+                        Text("Yes")
+                            .font(.caption2.weight(.medium))
+                            .foregroundStyle(.orange)
+                            .frame(width: 40)
+                            .contentShape(Capsule())
+                    }
+                    .buttonStyle(.plain)
+                    .padding(.vertical, 3)
+                    .glassEffect(.regular.tint(.orange.opacity(0.1)).interactive(), in: .capsule)
+                }
+            } else {
+                Button(action: { showFinishConfirm = true }) {
+                    Text("Stop & Finish Day")
+                        .font(.caption2.weight(.medium))
+                        .foregroundStyle(.orange)
+                        .frame(maxWidth: .infinity)
+                        .contentShape(Capsule())
+                }
+                .buttonStyle(.plain)
+                .padding(.vertical, 3)
+                .glassEffect(.regular.tint(.orange.opacity(0.1)).interactive(), in: .capsule)
+            }
         }
         .onAppear { sliderSpeed = max(currentSpeed, 0.5) }
         .onChange(of: state?.speed) { _, newSpeed in
@@ -84,6 +128,33 @@ struct RunningView: View {
             let reported = Double(newSpeed ?? 0) / 10.0
             if reported > 0 && abs(reported - sliderSpeed) > 0.05 {
                 sliderSpeed = reported
+            }
+        }
+    }
+
+    private func stopAndFinishDay() {
+        walkingPadService.command()?.setSpeed(speed: 0)
+
+        let notion: NotionService
+        let strava: StravaService
+        if let appDelegate = NSApp.delegate as? AppDelegate {
+            notion = appDelegate.notionService
+            strava = appDelegate.stravaService
+        } else {
+            notion = NotionService()
+            strava = StravaService()
+        }
+
+        // Wait a moment for the session to finalize, then post to Strava
+        ActivityLog.shared.progress("Stopping treadmill, waiting for session to finalize…")
+        Task {
+            try? await Task.sleep(for: .seconds(15))
+            ActivityLog.shared.progress("Fetching today's sessions from Notion…")
+            if let sessions = await notion.fetchTodaySessions(), !sessions.isEmpty {
+                let success = await strava.postTodayActivity(sessions: sessions, notionService: notion)
+                ActivityLog.shared.info("Stop & Finish Day: \(success ? "completed" : "failed")")
+            } else {
+                ActivityLog.shared.error("No sessions found for today")
             }
         }
     }
