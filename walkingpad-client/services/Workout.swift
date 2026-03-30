@@ -1,5 +1,6 @@
 import SwiftUI
 import Foundation
+import UserNotifications
 
 /// Snapshot of the current workout counters, used for MQTT publishing.
 struct WorkoutState {
@@ -55,11 +56,43 @@ class Workout: ObservableObject {
     private var consecutiveZeroStepUpdates: Int = 0
     private let zeroStepThreshold: Int = 3  // ~12 seconds at 4s polling
 
+    /// Tracks whether we've already sent the 60-min notification for the current session.
+    private var hasNotifiedForCurrentSession: Bool = false
+
     /// Called when a session completes (speed → 0). Used to push to Notion.
     public var onSessionComplete: ((SessionSaveData, Int) -> Void)? = nil
+
+    /// Called when the duration limit is hit. Passes the target speed (raw, tenths of km/h).
+    public var onSpeedNudge: ((UInt8) -> Void)? = nil
     
     init() {
         self.load()
+    }
+
+    /// Sends a macOS notification if the current session has been going for 60+ minutes.
+    /// Only fires once per session.
+    private func sendWalkingDurationNotificationIfNeeded() {
+        guard let start = currentSessionStart, !hasNotifiedForCurrentSession else { return }
+        let elapsed = Date().timeIntervalSince(start)
+        guard elapsed >= 3600 else { return }
+
+        hasNotifiedForCurrentSession = true
+
+        let content = UNMutableNotificationContent()
+        content.title = "WalkingPad"
+        content.body = "You've been walking for an hour. Take a break!"
+        content.sound = .default
+
+        let request = UNNotificationRequest(
+            identifier: "walkingpad.duration.60min",
+            content: content,
+            trigger: nil
+        )
+        UNUserNotificationCenter.current().add(request)
+        print("60-min walking notification sent, reducing speed to 1.5 km/h")
+
+        // Nudge: slow the treadmill to 1.5 km/h to encourage stopping
+        onSpeedNudge?(15)
     }
     
     /// Zeroes daily counters if the date has changed since the last update.
@@ -71,6 +104,7 @@ class Workout: ObservableObject {
             self.currentSessionSteps = 0
             self.currentSessionDistance = 0
             self.consecutiveZeroStepUpdates = 0
+            self.hasNotifiedForCurrentSession = false
             DispatchQueue.main.async {
                 self.distance = 0
                 self.steps = 0
@@ -115,6 +149,7 @@ class Workout: ObservableObject {
             self.currentSessionSteps = 0
             self.currentSessionDistance = 0
             self.consecutiveZeroStepUpdates = 0
+            self.hasNotifiedForCurrentSession = false
         }
 
         // Also start a session if we're getting steps but no session is active
@@ -125,11 +160,15 @@ class Workout: ObservableObject {
             self.currentSessionSteps = 0
             self.currentSessionDistance = 0
             self.consecutiveZeroStepUpdates = 0
+            self.hasNotifiedForCurrentSession = false
         }
 
         if self.currentSessionStart != nil {
             self.currentSessionSteps += stepDiff
             self.currentSessionDistance += distanceDiff
+
+            // Check if we need to send the 60-minute notification
+            sendWalkingDurationNotificationIfNeeded()
 
             // Track consecutive zero-step updates to detect belt stop
             if stepDiff == 0 {
@@ -157,6 +196,7 @@ class Workout: ObservableObject {
             self.currentSessionSteps = 0
             self.currentSessionDistance = 0
             self.consecutiveZeroStepUpdates = 0
+            self.hasNotifiedForCurrentSession = false
         }
 
         // Defer @Published mutations to avoid SwiftUI re-entrancy warnings

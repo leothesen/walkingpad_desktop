@@ -44,7 +44,7 @@ class NotionService: ObservableObject {
         loadConfig()
     }
 
-    // MARK: - Config (JSON file — no Keychain prompts)
+    // MARK: - Config (JSON file)
 
     func saveConfig(apiKey: String, databaseId: String) {
         self.apiKey = apiKey
@@ -81,17 +81,22 @@ class NotionService: ObservableObject {
     // MARK: - Push Session
 
     /// Pushes a completed session to the Notion database.
+    /// Queries existing sessions for the day to determine the correct session number.
     func pushSession(_ sessionData: SessionSaveData, sessionNumber: Int) async -> Bool {
         guard let apiKey = apiKey, let databaseId = databaseId else {
             print("Notion: not configured, skipping push")
             return false
         }
 
+        // Query Notion for how many sessions already exist today to get correct numbering
+        let existingCount = await fetchTodaySessions()?.count ?? 0
+        let actualSessionNumber = existingCount + 1
+
         let duration = sessionData.endTime.timeIntervalSince(sessionData.startTime) / 60.0
         let dateStr = Self.dateFormatter.string(from: sessionData.startTime)
         let startStr = Self.timeFormatter.string(from: sessionData.startTime)
         let endStr = Self.timeFormatter.string(from: sessionData.endTime)
-        let titleStr = "Session #\(sessionNumber) - \(Self.titleDateFormatter.string(from: sessionData.startTime))"
+        let titleStr = "Session #\(actualSessionNumber) - \(Self.titleDateFormatter.string(from: sessionData.startTime))"
 
         let body: [String: Any] = [
             "parent": ["database_id": databaseId],
