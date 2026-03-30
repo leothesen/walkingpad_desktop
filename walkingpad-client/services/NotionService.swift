@@ -183,6 +183,44 @@ class NotionService: ObservableObject {
         return allSessions
     }
 
+    /// Fetches only today's sessions from Notion (filtered by date).
+    func fetchTodaySessions() async -> [SessionSaveData]? {
+        guard let apiKey = apiKey, let databaseId = databaseId else { return nil }
+
+        let todayStr = Self.dateFormatter.string(from: Date())
+        let body: [String: Any] = [
+            "page_size": 100,
+            "filter": [
+                "property": "Date",
+                "date": ["equals": todayStr]
+            ]
+        ]
+
+        do {
+            var request = URLRequest(url: URL(string: "\(baseURL)/databases/\(databaseId)/query")!)
+            request.httpMethod = "POST"
+            request.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
+            request.setValue(notionVersion, forHTTPHeaderField: "Notion-Version")
+            request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+            request.httpBody = try JSONSerialization.data(withJSONObject: body)
+
+            let (data, response) = try await session.data(for: request)
+
+            guard let httpResponse = response as? HTTPURLResponse, httpResponse.statusCode == 200,
+                  let json = try JSONSerialization.jsonObject(with: data) as? [String: Any],
+                  let results = json["results"] as? [[String: Any]] else {
+                return nil
+            }
+
+            let sessions = results.compactMap { parseSession(from: $0) }
+            print("Notion: fetched \(sessions.count) sessions for today (\(todayStr))")
+            return sessions
+        } catch {
+            print("Notion: fetchTodaySessions error: \(error)")
+            return nil
+        }
+    }
+
     /// Tests the connection by fetching 1 row.
     func testConnection() async -> Bool {
         guard let apiKey = apiKey, let databaseId = databaseId else { return false }

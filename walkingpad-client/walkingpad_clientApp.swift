@@ -58,7 +58,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             }
         }
 
-        // Push completed sessions to Notion, clear local data on success
+        // Push completed sessions to Notion, then fetch today's total for status bar
         workout.onSessionComplete = { [weak self] session, sessionNumber in
             guard let self = self, self.notionService.isConfigured else { return }
             Task {
@@ -66,6 +66,14 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                 if success {
                     print("Notion push succeeded, clearing local workout data")
                     FileSystem().save(filename: "workouts.json", data: try! JSONEncoder().encode(WorkoutsSaveData(workouts: [])))
+
+                    // Fetch today's total from Notion for the status bar
+                    if let sessions = await self.notionService.fetchTodaySessions() {
+                        let totalDist = sessions.reduce(0) { $0 + $1.distance }
+                        await MainActor.run {
+                            self.workout.todayTotalDistance = totalDist
+                        }
+                    }
                 }
             }
         }
@@ -75,6 +83,13 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         self.walkingPadService.callback = { oldState, newState in
             self.workout.update(oldState, newState)
             self.mqttService.publish(oldState: oldState, newState: newState, workoutState: self.workout.workoutState())
+            // Update status bar after @Published mutations have been dispatched
+            DispatchQueue.main.async {
+                // Read distance after the async update in Workout.update() has applied
+                DispatchQueue.main.async {
+                    self.updateStatusBarTitle(speed: newState.speed)
+                }
+            }
         }
 
         self.mqttService.start()
@@ -143,9 +158,52 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         Task {
             await self.hcGatewayService.initialize()
         }
+
+        // Fetch today's total from Notion for the status bar on launch
+        Task {
+            if self.notionService.isConfigured,
+               let sessions = await self.notionService.fetchTodaySessions() {
+                let totalDist = sessions.reduce(0) { $0 + $1.distance }
+                await MainActor.run {
+                    self.workout.todayTotalDistance = totalDist
+                    self.updateStatusBarTitle(speed: 0)
+                }
+            }
+        }
     }
 
     @objc func update() {
         self.walkingPadService.command()?.updateStatus()
+    }
+
+    /// Updates the status bar to show live session stats when walking,
+    /// or today's total distance (from Notion) when idle.
+    private func updateStatusBarTitle(speed: Int) {
+        guard let button = self.statusBarItem?.button else { return }
+
+        if speed > 0, let sessionStart = workout.currentSessionStartTime {
+            // Active session: show current session distance + duration
+            let dist = workout.sessionDistance
+            let elapsed = Int(Date().timeIntervalSince(sessionStart))
+            let mins = elapsed / 60
+            let secs = elapsed % 60
+
+            let distStr = dist >= 1000 ? String(format: "%.2f km", Double(dist) / 1000.0) : "\(dist) m"
+            button.title = " \(distStr) · \(mins):\(String(format: "%02d", secs))"
+            button.image = nil
+        } else {
+            // Idle: show today's total from Notion (or local fallback)
+            let totalDist = workout.todayTotalDistance
+            if totalDist > 0 {
+                let distStr = totalDist >= 1000 ? String(format: "%.2f km", Double(totalDist) / 1000.0) : "\(totalDist) m"
+                button.title = " \(distStr)"
+                button.image = NSImage(named: "StatusIcon")
+                button.image?.isTemplate = true
+            } else {
+                button.title = ""
+                button.image = NSImage(named: "StatusIcon")
+                button.image?.isTemplate = true
+            }
+        }
     }
 }

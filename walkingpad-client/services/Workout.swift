@@ -39,9 +39,19 @@ class Workout: ObservableObject {
     public var lastUpdateTime: Date = Date()
 
     // Session tracking state
-    private var currentSessionStart: Date? = nil
+    /// Exposed for status bar display of session duration.
+    private(set) var currentSessionStart: Date? = nil
+    var currentSessionStartTime: Date? { currentSessionStart }
+
+    /// Current session stats — reset on each new session start.
+    @Published public var sessionSteps: Int = 0
+    @Published public var sessionDistance: Int = 0
+
     private var currentSessionSteps: Int = 0
     private var currentSessionDistance: Int = 0
+
+    /// Today's total distance fetched from Notion (set after session ends).
+    @Published public var todayTotalDistance: Int = 0
     /// Count of consecutive zero-step updates while a session is active.
     /// Used to detect belt stop even when the treadmill keeps reporting non-zero speed.
     private var consecutiveZeroStepUpdates: Int = 0
@@ -162,9 +172,15 @@ class Workout: ObservableObject {
             self.walkingSeconds = self.walkingSeconds + walkingTimeDiff
             self.lastUpdateTime = newState.time
 
+            // Update current session published values
+            self.sessionSteps = self.currentSessionSteps
+            self.sessionDistance = self.currentSessionDistance
+
             if let session = completedSession {
                 print("SESSION COMPLETE: appending session #\(self.todaySessions.count + 1), steps=\(session.steps), dist=\(session.distance)")
                 self.todaySessions.append(session)
+                self.sessionSteps = 0
+                self.sessionDistance = 0
                 self.save()
                 self.onSessionComplete?(session, self.todaySessions.count)
             }

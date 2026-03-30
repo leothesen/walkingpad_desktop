@@ -16,22 +16,27 @@ func formatTime(_ seconds: Int) -> String {
     return formatter.string(from: TimeInterval(seconds)) ?? ""
 }
 
+/// Shows current session distance + steps + time (not daily accumulation).
 struct WorkoutStateView: View {
     @EnvironmentObject var workout: Workout
     @EnvironmentObject var walkingPadService: WalkingPadService
 
     var body: some View {
+        let sessionElapsed = workout.currentSessionStartTime.map {
+            Int(Date().timeIntervalSince($0))
+        } ?? 0
+
         VStack(spacing: 1) {
-            Text(distanceTextFor(workout.distance))
+            Text(distanceTextFor(workout.sessionDistance))
                 .font(.system(size: 20, weight: .semibold, design: .rounded))
             HStack(spacing: 4) {
                 Image(systemName: "figure.walk")
                     .font(.system(size: 9))
                     .foregroundStyle(.tertiary)
-                Text("\(workout.steps)")
+                Text("\(workout.sessionSteps)")
                 Text("·")
                     .foregroundStyle(.quaternary)
-                Text(formatTime(workout.walkingSeconds))
+                Text(formatTime(sessionElapsed))
             }
             .font(.caption2)
             .foregroundStyle(.secondary)
