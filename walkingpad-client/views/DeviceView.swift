@@ -1,7 +1,6 @@
 import SwiftUI
 import CoreBluetooth
 
-
 struct DeviceView: View {
     @EnvironmentObject
     var walkingPadService: WalkingPadService

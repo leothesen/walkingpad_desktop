@@ -1,27 +1,27 @@
 import SwiftUI
 
-/// Bottom bar with Stats link, Login/Logout button, and Quit button.
+/// Bottom bar with Stats and Quit buttons, pinned to the bottom of the popover.
 /// Warning: Quit uses exit(0) which bypasses cleanup — see KNOWN_ISSUES.md #8.
 struct FooterView: View {
     @EnvironmentObject var walkingPadService: WalkingPadService
     @EnvironmentObject var workout: Workout
-    @Environment(\.openURL) var openURL
+
+    /// Singleton reference to prevent duplicate stats windows.
+    private static var statsWindow: NSWindow?
 
     var body: some View {
-        HStack(spacing: 8) {
-            Spacer()
-            Button(action: {
-                openURL(URL(string: "https://walkingpad-stats.netlify.app")!)
-            }) {
-                Text("Stats")
-                    .font(.caption.weight(.medium))
+        HStack(spacing: 6) {
+            Button(action: { openStatsWindow() }) {
+                Label("Stats", systemImage: "chart.bar")
+                    .font(.caption2.weight(.medium))
+                    .contentShape(Capsule())
             }
             .buttonStyle(.plain)
             .padding(.horizontal, 8)
-            .padding(.vertical, 4)
+            .padding(.vertical, 3)
             .glassEffect(.regular.interactive(), in: .capsule)
 
-            LoginLogoutButton()
+            Spacer()
 
             Button(action: {
                 walkingPadService.command()?.setSpeed(speed: 0)
@@ -29,12 +29,85 @@ struct FooterView: View {
                 exit(0)
             }) {
                 Text("Quit")
-                    .font(.caption.weight(.medium))
+                    .font(.caption2.weight(.medium))
+                    .foregroundStyle(.secondary)
+                    .contentShape(Capsule())
             }
             .buttonStyle(.plain)
             .padding(.horizontal, 8)
-            .padding(.vertical, 4)
+            .padding(.vertical, 3)
             .glassEffect(.regular.interactive(), in: .capsule)
+        }
+    }
+
+    private var notionService: NotionService {
+        // Access via AppDelegate; if cast fails, create a standalone instance
+        // that still reads from Keychain (config persists across instances)
+        if let appDelegate = NSApp.delegate as? AppDelegate {
+            return appDelegate.notionService
+        }
+        print("Warning: could not access AppDelegate, creating standalone NotionService")
+        return NotionService()
+    }
+
+    private func openStatsWindow() {
+        // Close existing window so we always show fresh data
+        if let existing = FooterView.statsWindow {
+            existing.close()
+            FooterView.statsWindow = nil
+        }
+
+        let notion = notionService
+        let notionConfigured = notion.isConfigured
+
+        // If Notion is configured, start empty and load from Notion only.
+        // Otherwise fall back to local data.
+        let initialWorkouts = notionConfigured ? [] : workout.loadAll()
+        let viewModel = StatsViewModel(workouts: initialWorkouts)
+        if notionConfigured { viewModel.isLoading = true }
+
+        let statsView = StatsWindowView(
+            viewModel: viewModel,
+            walkingPadService: walkingPadService,
+            notionService: notion
+        )
+        let hostingView = NSHostingView(rootView: statsView)
+
+        let window = NSWindow(
+            contentRect: NSRect(x: 0, y: 0, width: 500, height: 480),
+            styleMask: [.titled, .closable, .resizable, .miniaturizable],
+            backing: .buffered,
+            defer: false
+        )
+        window.center()
+        window.title = "WalkingPad Stats"
+        window.contentView = hostingView
+        window.isReleasedWhenClosed = false
+        window.minSize = NSSize(width: 400, height: 400)
+        window.makeKeyAndOrderFront(nil)
+
+        FooterView.statsWindow = window
+
+        // Fetch from Notion — only source of truth when configured
+        if notionConfigured {
+            Task {
+                if let sessions = await notion.fetchAllSessions() {
+                    let workouts = NotionService.groupSessionsByDate(sessions)
+                    print("Stats: replacing with \(workouts.count) days from Notion (\(sessions.count) sessions)")
+                    for w in workouts {
+                        print("  Day: \(w.date), steps=\(w.steps), dist=\(w.distance), sessions=\(w.sessions?.count ?? 0)")
+                    }
+                    await MainActor.run {
+                        viewModel.replaceWorkouts(workouts, source: "Notion")
+                    }
+                } else {
+                    // Notion unreachable — fall back to local as emergency
+                    let localWorkouts = workout.loadAll()
+                    await MainActor.run {
+                        viewModel.replaceWorkouts(localWorkouts, source: "local (Notion unavailable)")
+                    }
+                }
+            }
         }
     }
 }

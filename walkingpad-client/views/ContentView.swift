@@ -7,25 +7,19 @@ struct ContentView: View {
     @EnvironmentObject var workout: Workout
 
     var body: some View {
-        GlassEffectContainer {
-            VStack(spacing: 12) {
+        GlassEffectContainer(spacing: 6) {
+            VStack(spacing: 6) {
                 if walkingPadService.isConnected() {
                     DeviceView()
                 } else {
                     WaitingForTreadmillView()
                 }
 
-                Spacer()
+                Divider().opacity(0.15)
 
                 FooterView()
             }
-            .padding(12)
+            .padding(10)
         }
-    }
-}
-
-struct ContentView_Previews: PreviewProvider {
-    static var previews: some View {
-        ContentView()
     }
 }

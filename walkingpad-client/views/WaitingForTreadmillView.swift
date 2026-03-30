@@ -1,25 +1,16 @@
-
 import SwiftUI
 
 struct WaitingForTreadmillView: View {
     var body: some View {
-        VStack {
-            Spacer()
-            VStack(spacing: 8) {
-                ProgressView()
-                Text("Waiting for treadmill...")
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
-            }
-            .padding(16)
-            .glassEffect(.regular, in: .rect(cornerRadius: 14))
-            Spacer()
+        VStack(spacing: 6) {
+            ProgressView()
+                .controlSize(.small)
+            Text("Searching for treadmill…")
+                .font(.caption)
+                .foregroundStyle(.secondary)
         }
-    }
-}
-
-struct SearchingForDeviceView_Previews: PreviewProvider {
-    static var previews: some View {
-        WaitingForTreadmillView()
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 20)
+        .glassEffect(.regular, in: .rect(cornerRadius: 10))
     }
 }

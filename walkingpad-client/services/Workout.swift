@@ -31,10 +31,36 @@ class Workout: ObservableObject {
     
     @Published
     public var walkingSeconds: Int = 0
-    
+
+    /// Sessions completed today (persisted to workouts.json).
+    @Published
+    public var todaySessions: [SessionSaveData] = []
+
     public var lastUpdateTime: Date = Date()
-    
+
+    // Session tracking state
+    /// Exposed for status bar display of session duration.
+    private(set) var currentSessionStart: Date? = nil
+    var currentSessionStartTime: Date? { currentSessionStart }
+
+    /// Current session stats — reset on each new session start.
+    @Published public var sessionSteps: Int = 0
+    @Published public var sessionDistance: Int = 0
+
+    private var currentSessionSteps: Int = 0
+    private var currentSessionDistance: Int = 0
+
+    /// Today's total distance fetched from Notion (set after session ends).
+    @Published public var todayTotalDistance: Int = 0
+    /// Count of consecutive zero-step updates while a session is active.
+    /// Used to detect belt stop even when the treadmill keeps reporting non-zero speed.
+    private var consecutiveZeroStepUpdates: Int = 0
+    private let zeroStepThreshold: Int = 3  // ~12 seconds at 4s polling
+
     public var onChangeCallback: OnChangeCallback =  {_ in }
+
+    /// Called when a session completes (speed → 0). Used to push to Notion.
+    public var onSessionComplete: ((SessionSaveData, Int) -> Void)? = nil
     
     init() {
         self.load()
@@ -45,54 +71,134 @@ class Workout: ObservableObject {
     public func resetIfDateChanged() {
         let now = Date()
         if now.get(.day) != self.lastUpdateTime.get(.day) && self.steps > 0 {
-            self.distance = 0
-            self.steps = 0
-            self.walkingSeconds = 0
+            self.currentSessionStart = nil
+            self.currentSessionSteps = 0
+            self.currentSessionDistance = 0
+            self.consecutiveZeroStepUpdates = 0
+            DispatchQueue.main.async {
+                self.distance = 0
+                self.steps = 0
+                self.walkingSeconds = 0
+                self.todaySessions = []
+            }
         }
     }
     
     /// Processes a BLE state update by computing diffs and accumulating daily totals.
     /// Guards against negative diffs (treadmill reset) and initial reconnection state.
     /// Fires `onChangeCallback` with a Change struct for the StepsUploader.
+    /// @Published mutations are deferred to the next main run loop iteration to avoid
+    /// "Publishing changes from within view updates" warnings.
     public func update(_ oldState: DeviceState?, _ newState: DeviceState) {
         self.resetIfDateChanged()
 
-        let stepDiff = newState.steps - (oldState?.steps ?? 0)
-        let distanceDiff = newState.distance - (oldState?.distance ?? 0)
-        let walkingTimeDiff = newState.walkingTimeSeconds - ( oldState?.walkingTimeSeconds ?? 0)
-        
-        if ((self.steps > 0 && oldState == nil) || stepDiff < 0 || distanceDiff < 0) {
+        // Skip the first update after connection — oldState is nil so we can't compute
+        // a meaningful diff (newState contains the treadmill's cumulative counters since power-on).
+        guard let oldState = oldState else { return }
+
+        let stepDiff = newState.steps - oldState.steps
+        let distanceDiff = newState.distance - oldState.distance
+        let walkingTimeDiff = newState.walkingTimeSeconds - oldState.walkingTimeSeconds
+
+        // Guard against negative diffs (treadmill counter reset)
+        if stepDiff < 0 || distanceDiff < 0 {
             return
         }
-        if (oldState != nil && oldState?.speed != newState.speed) {
+        if oldState.speed != newState.speed {
             save()
         }
-        
+
         print("adding steps=\(stepDiff) distance=\(distanceDiff)")
-        
+
         if (self.steps > 0 && newState.statusType == .currentStatus) {
             let change = Change(
                 oldTime: self.lastUpdateTime,
                 newTime: newState.time,
                 stepsDiff: stepDiff,
-                oldSpeed: oldState?.speed ?? 0,
+                oldSpeed: oldState.speed,
                 newSpeed: newState.speed
             )
             self.onChangeCallback(change)
         }
-        
-        self.steps = self.steps + stepDiff
-        self.distance = self.distance + distanceDiff
-        self.walkingSeconds = self.walkingSeconds + walkingTimeDiff
-        self.lastUpdateTime = newState.time
-        
+
+        // Session tracking (non-published state, safe to update synchronously)
+        let wasWalking = oldState.speed > 0
+        let isWalking = newState.speed > 0
+
+        if isWalking && !wasWalking && self.currentSessionStart == nil {
+            print("SESSION START: speed \(oldState.speed) → \(newState.speed)")
+            self.currentSessionStart = newState.time
+            self.currentSessionSteps = 0
+            self.currentSessionDistance = 0
+            self.consecutiveZeroStepUpdates = 0
+        }
+
+        if self.currentSessionStart != nil {
+            self.currentSessionSteps += stepDiff
+            self.currentSessionDistance += distanceDiff
+
+            // Track consecutive zero-step updates to detect belt stop
+            if stepDiff == 0 {
+                self.consecutiveZeroStepUpdates += 1
+                print("SESSION IDLE: \(self.consecutiveZeroStepUpdates)/\(self.zeroStepThreshold) zero-step updates, speed=\(newState.speed)")
+            } else {
+                self.consecutiveZeroStepUpdates = 0
+            }
+        }
+
+        // End session when: explicit speed→0 transition, OR belt appears stopped
+        // (several consecutive updates with no steps while session is active)
+        let beltStopped = self.currentSessionStart != nil && self.consecutiveZeroStepUpdates >= self.zeroStepThreshold
+        var completedSession: SessionSaveData? = nil
+
+        if (wasWalking && !isWalking || beltStopped), let sessionStart = self.currentSessionStart {
+            print("SESSION END: speed \(oldState.speed) → \(newState.speed), steps=\(self.currentSessionSteps), dist=\(self.currentSessionDistance), reason=\(beltStopped ? "idle" : "speed→0")")
+            completedSession = SessionSaveData(
+                startTime: sessionStart,
+                endTime: newState.time,
+                steps: self.currentSessionSteps,
+                distance: self.currentSessionDistance
+            )
+            self.currentSessionStart = nil
+            self.currentSessionSteps = 0
+            self.currentSessionDistance = 0
+            self.consecutiveZeroStepUpdates = 0
+        }
+
+        // Defer @Published mutations to avoid SwiftUI re-entrancy warnings
+        DispatchQueue.main.async {
+            self.steps = self.steps + stepDiff
+            self.distance = self.distance + distanceDiff
+            self.walkingSeconds = self.walkingSeconds + walkingTimeDiff
+            self.lastUpdateTime = newState.time
+
+            // Update current session published values
+            self.sessionSteps = self.currentSessionSteps
+            self.sessionDistance = self.currentSessionDistance
+
+            if let session = completedSession {
+                print("SESSION COMPLETE: appending session #\(self.todaySessions.count + 1), steps=\(session.steps), dist=\(session.distance)")
+                self.todaySessions.append(session)
+                self.sessionSteps = 0
+                self.sessionDistance = 0
+                self.save()
+                self.onSessionComplete?(session, self.todaySessions.count)
+            }
+        }
+
     }
     
     
     /// Persists the current day's workout data to workouts.json.
     /// Replaces today's entry in the history and writes the full array.
     public func save() {
-        let workoutData = WorkoutSaveData(steps: self.steps, distance: self.distance, walkingSeconds: self.walkingSeconds, date: self.lastUpdateTime)
+        let workoutData = WorkoutSaveData(
+            steps: self.steps,
+            distance: self.distance,
+            walkingSeconds: self.walkingSeconds,
+            date: self.lastUpdateTime,
+            sessions: self.todaySessions.isEmpty ? nil : self.todaySessions
+        )
         let withoutToday = loadAll().filter { !Calendar.current.isDateInToday($0.date)}
         let newData = withoutToday + [workoutData];
         
@@ -118,6 +224,7 @@ class Workout: ObservableObject {
             self.distance = foundWorkout.distance
             self.walkingSeconds = foundWorkout.walkingSeconds
             self.lastUpdateTime = foundWorkout.date
+            self.todaySessions = foundWorkout.sessions ?? []
         }
     }
     
