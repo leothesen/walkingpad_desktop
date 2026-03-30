@@ -1,8 +1,6 @@
 import SwiftUI
 import Foundation
 
-public typealias OnChangeCallback = (_ change: Change) -> Void
-
 /// Snapshot of the current workout counters, used for MQTT publishing.
 struct WorkoutState {
     var steps: Int
@@ -57,8 +55,6 @@ class Workout: ObservableObject {
     private var consecutiveZeroStepUpdates: Int = 0
     private let zeroStepThreshold: Int = 3  // ~12 seconds at 4s polling
 
-    public var onChangeCallback: OnChangeCallback =  {_ in }
-
     /// Called when a session completes (speed → 0). Used to push to Notion.
     public var onSessionComplete: ((SessionSaveData, Int) -> Void)? = nil
     
@@ -86,7 +82,6 @@ class Workout: ObservableObject {
     
     /// Processes a BLE state update by computing diffs and accumulating daily totals.
     /// Guards against negative diffs (treadmill reset) and initial reconnection state.
-    /// Fires `onChangeCallback` with a Change struct for the StepsUploader.
     /// @Published mutations are deferred to the next main run loop iteration to avoid
     /// "Publishing changes from within view updates" warnings.
     public func update(_ oldState: DeviceState?, _ newState: DeviceState) {
@@ -109,17 +104,6 @@ class Workout: ObservableObject {
         }
 
         print("adding steps=\(stepDiff) distance=\(distanceDiff)")
-
-        if (self.steps > 0 && newState.statusType == .currentStatus) {
-            let change = Change(
-                oldTime: self.lastUpdateTime,
-                newTime: newState.time,
-                stepsDiff: stepDiff,
-                oldSpeed: oldState.speed,
-                newSpeed: newState.speed
-            )
-            self.onChangeCallback(change)
-        }
 
         // Session tracking (non-published state, safe to update synchronously)
         let wasWalking = oldState.speed > 0
