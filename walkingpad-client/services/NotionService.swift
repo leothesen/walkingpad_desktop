@@ -163,6 +163,15 @@ class NotionService: ObservableObject {
                 }
 
                 for page in results {
+                    // Skip archived/trashed pages
+                    let archived = page["archived"] as? Bool ?? false
+                    let inTrash = page["in_trash"] as? Bool ?? false
+                    if archived || inTrash {
+                        let title = ((page["properties"] as? [String: Any])?["Session"] as? [String: Any])?["title"] as? [[String: Any]]
+                        let name = (title?.first?["plain_text"] as? String) ?? "unknown"
+                        print("Notion: skipping archived/trashed page: \(name)")
+                        continue
+                    }
                     if let session = parseSession(from: page) {
                         allSessions.append(session)
                     }
@@ -212,7 +221,9 @@ class NotionService: ObservableObject {
                 return nil
             }
 
-            let sessions = results.compactMap { parseSession(from: $0) }
+            let sessions = results.filter {
+                !($0["archived"] as? Bool ?? false) && !($0["in_trash"] as? Bool ?? false)
+            }.compactMap { parseSession(from: $0) }
             print("Notion: fetched \(sessions.count) sessions for today (\(todayStr))")
             return sessions
         } catch {

@@ -23,13 +23,33 @@ struct RunningView: View {
                     .font(.system(size: 10))
                     .foregroundStyle(.tertiary)
 
-                Slider(value: $sliderSpeed, in: 0.5...8.0, step: 0.5) {
-                    SwiftUI.EmptyView()
-                } onEditingChanged: { editing in
-                    isDragging = editing
-                    if !editing {
-                        walkingPadService.command()?.setSpeed(speed: UInt8(sliderSpeed * 10))
+                HStack(spacing: 6) {
+                    Button(action: { nudgeSpeed(-0.1) }) {
+                        Image(systemName: "minus")
+                            .font(.caption2.weight(.semibold))
+                            .frame(width: 20, height: 20)
+                            .contentShape(Circle())
                     }
+                    .buttonStyle(.plain)
+                    .glassEffect(.regular.interactive(), in: .circle)
+
+                    Slider(value: $sliderSpeed, in: 0.5...8.0, step: 0.5) {
+                        SwiftUI.EmptyView()
+                    } onEditingChanged: { editing in
+                        isDragging = editing
+                        if !editing {
+                            walkingPadService.command()?.setSpeed(speed: UInt8(sliderSpeed * 10))
+                        }
+                    }
+
+                    Button(action: { nudgeSpeed(0.1) }) {
+                        Image(systemName: "plus")
+                            .font(.caption2.weight(.semibold))
+                            .frame(width: 20, height: 20)
+                            .contentShape(Circle())
+                    }
+                    .buttonStyle(.plain)
+                    .glassEffect(.regular.interactive(), in: .circle)
                 }
                 .padding(.top, 2)
             }
@@ -66,6 +86,13 @@ struct RunningView: View {
                 sliderSpeed = reported
             }
         }
+    }
+
+    private func nudgeSpeed(_ delta: Double) {
+        let newSpeed = min(max(sliderSpeed + delta, 0.5), 8.0)
+        // Round to nearest 0.1 to avoid floating point drift
+        sliderSpeed = (newSpeed * 10).rounded() / 10
+        walkingPadService.command()?.setSpeed(speed: UInt8(sliderSpeed * 10))
     }
 
     private func modeButton(_ mode: WalkingMode, current: WalkingMode?) -> some View {

@@ -117,6 +117,16 @@ class Workout: ObservableObject {
             self.consecutiveZeroStepUpdates = 0
         }
 
+        // Also start a session if we're getting steps but no session is active
+        // (happens when treadmill was already moving on first valid state pair)
+        if isWalking && stepDiff > 0 && self.currentSessionStart == nil {
+            print("SESSION START (mid-walk): speed=\(newState.speed), steps already flowing")
+            self.currentSessionStart = newState.time
+            self.currentSessionSteps = 0
+            self.currentSessionDistance = 0
+            self.consecutiveZeroStepUpdates = 0
+        }
+
         if self.currentSessionStart != nil {
             self.currentSessionSteps += stepDiff
             self.currentSessionDistance += distanceDiff
