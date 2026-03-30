@@ -113,11 +113,15 @@ struct RunningView: View {
         }
 
         // Wait a moment for the session to finalize, then post to Strava
+        ActivityLog.shared.progress("Stopping treadmill, waiting for session to finalize…")
         Task {
             try? await Task.sleep(for: .seconds(15))
+            ActivityLog.shared.progress("Fetching today's sessions from Notion…")
             if let sessions = await notion.fetchTodaySessions(), !sessions.isEmpty {
-                let success = await strava.postTodayActivity(sessions: sessions)
-                print("Stop & Finish Day: Strava post \(success ? "succeeded" : "failed")")
+                let success = await strava.postTodayActivity(sessions: sessions, notionService: notion)
+                ActivityLog.shared.info("Stop & Finish Day: \(success ? "completed" : "failed")")
+            } else {
+                ActivityLog.shared.error("No sessions found for today")
             }
         }
     }

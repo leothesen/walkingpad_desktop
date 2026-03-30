@@ -1,6 +1,7 @@
 import SwiftUI
 
 enum DebugTab: String, CaseIterable {
+    case activityLog = "Log"
     case rawData = "Raw Data"
     case bleConsole = "BLE Console"
     case storage = "Storage"
@@ -24,7 +25,7 @@ struct DebugView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            Picker("Tab", selection: $selectedTab) {
+            Picker("", selection: $selectedTab) {
                 ForEach(DebugTab.allCases, id: \.self) { tab in
                     Text(tab.rawValue).tag(tab)
                 }
@@ -35,6 +36,8 @@ struct DebugView: View {
             Divider()
 
             switch selectedTab {
+            case .activityLog:
+                activityLogTab
             case .rawData:
                 rawDataTab
             case .bleConsole:
@@ -250,6 +253,12 @@ struct DebugView: View {
             }
             .padding(12)
         }
+    }
+
+    // MARK: - Activity Log Tab
+
+    private var activityLogTab: some View {
+        ActivityLogTabView()
     }
 
     // MARK: - Raw Data Tab

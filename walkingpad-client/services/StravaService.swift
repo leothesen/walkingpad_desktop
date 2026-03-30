@@ -1,6 +1,5 @@
 import Foundation
 import AppKit
-import Security
 
 /// Strava integration: OAuth2 authentication, daily activity posting, sync state tracking.
 class StravaService: ObservableObject {
@@ -9,20 +8,27 @@ class StravaService: ObservableObject {
     @Published var isSyncing: Bool = false
     @Published var lastError: String? = nil
 
-    // Loaded from Keychain — configured via debug panel
     private var clientId: String?
     private var clientSecret: String?
 
     private let baseURL = "https://www.strava.com"
     private let apiURL = "https://www.strava.com/api/v3"
     private let redirectURI = "http://localhost:8234/callback"
-    private let keychainService = "com.walkingpad.strava"
-    private let syncedDatesKey = "stravaSyncedDates"
 
     private var accessToken: String?
     private var refreshToken: String?
     private var expiresAt: Date?
     private var oauthServer: StravaOAuthServer?
+
+    private let configFilename = ".walkingpad-client-strava.json"
+
+    private struct StravaConfig: Codable {
+        var clientId: String?
+        var clientSecret: String?
+        var accessToken: String?
+        var refreshToken: String?
+        var expiresAt: Double?  // timeIntervalSince1970
+    }
 
     private static let dateFormatter: DateFormatter = {
         let f = DateFormatter()
@@ -35,26 +41,21 @@ class StravaService: ObservableObject {
     }
 
     init() {
-        clientId = loadKeychain(key: "clientId")
-        clientSecret = loadKeychain(key: "clientSecret")
-        loadTokens()
-        isSyncedToday = isDaySynced(Date())
+        loadAllConfig()
     }
 
     /// Save Strava API credentials (from debug panel).
     func saveClientConfig(clientId: String, clientSecret: String) {
-        saveKeychain(key: "clientId", value: clientId)
-        saveKeychain(key: "clientSecret", value: clientSecret)
         self.clientId = clientId
         self.clientSecret = clientSecret
+        saveAllConfig()
     }
 
     func clearClientConfig() {
-        deleteKeychain(key: "clientId")
-        deleteKeychain(key: "clientSecret")
         self.clientId = nil
         self.clientSecret = nil
         disconnect()
+        saveAllConfig()
     }
 
     // MARK: - OAuth Flow
@@ -144,31 +145,36 @@ class StravaService: ObservableObject {
         }
     }
 
-    /// Disconnect from Strava — clear all tokens.
+    /// Disconnect from Strava — clear tokens and save.
     func disconnect() {
         accessToken = nil
         refreshToken = nil
         expiresAt = nil
         isConnected = false
         isSyncedToday = false
-        deleteKeychain(key: "accessToken")
-        deleteKeychain(key: "refreshToken")
-        deleteKeychain(key: "expiresAt")
+        saveAllConfig()
         print("Strava: disconnected")
     }
 
     // MARK: - Post Activity
 
-    /// Posts today's combined walking activity to Strava.
-    func postTodayActivity(sessions: [SessionSaveData]) async -> Bool {
+    private let log = ActivityLog.shared
+
+    /// Posts today's combined walking activity to Strava and records in Notion Day Totals.
+    func postTodayActivity(sessions: [SessionSaveData], notionService: NotionService? = nil) async -> Bool {
         guard !sessions.isEmpty else {
-            print("Strava: no sessions to post")
+            log.info("Strava: no sessions to post")
             return false
         }
-        guard !isDaySynced(Date()) else {
-            print("Strava: already synced today")
-            await MainActor.run { isSyncedToday = true }
-            return true
+
+        // Check Notion Day Totals for existing post
+        if let notion = notionService {
+            log.progress("Checking if already posted today…")
+            if let dayTotal = await notion.fetchDayTotal(for: Date()), dayTotal.stravaPosted {
+                log.info("Already posted to Strava today")
+                await MainActor.run { isSyncedToday = true }
+                return true
+            }
         }
 
         await MainActor.run {
@@ -176,12 +182,11 @@ class StravaService: ObservableObject {
             lastError = nil
         }
 
+        log.progress("Refreshing Strava token…")
         await refreshTokenIfNeeded()
         guard let token = accessToken else {
-            await MainActor.run {
-                isSyncing = false
-                lastError = "Not authenticated"
-            }
+            log.error("Not authenticated with Strava")
+            await MainActor.run { isSyncing = false; lastError = "Not authenticated" }
             return false
         }
 
@@ -191,6 +196,8 @@ class StravaService: ObservableObject {
         let firstStart = sessions.min(by: { $0.startTime < $1.startTime })!.startTime
         let distKm = Double(totalDistance) / 1000.0
         let avgSpeed = totalSeconds > 0 ? (distKm / (Double(totalSeconds) / 3600.0)) : 0
+
+        log.progress("Posting \(String(format: "%.1f", distKm))km to Strava (\(sessions.count) sessions)…")
 
         let iso8601 = ISO8601DateFormatter()
         iso8601.formatOptions = [.withInternetDateTime]
@@ -216,16 +223,25 @@ class StravaService: ObservableObject {
             let statusCode = (response as? HTTPURLResponse)?.statusCode ?? -1
 
             if statusCode == 201 {
-                print("Strava: activity posted successfully")
-                markDaySynced(Date())
+                let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any]
+                let activityId = (json?["id"] as? Int).map { String($0) } ?? "unknown"
+
+                log.success("Posted to Strava! Activity ID: \(activityId)")
+
+                // Update Notion Day Totals
+                if let notion = notionService {
+                    log.progress("Saving day totals to Notion…")
+                    let updated = await notion.upsertDayTotal(date: Date(), sessions: sessions, stravaActivityId: activityId)
+                    log.info("Day totals \(updated ? "saved to Notion" : "failed to save")")
+                }
+
                 await MainActor.run {
                     isSyncing = false
                     isSyncedToday = true
                 }
                 return true
             } else if [401, 403].contains(statusCode) {
-                let responseBody = String(data: data, encoding: .utf8) ?? ""
-                print("Strava: auth error \(statusCode): \(responseBody)")
+                log.error("Strava auth error (\(statusCode)) — reconnect needed")
                 await MainActor.run {
                     isSyncing = false
                     lastError = "Auth error — reconnect Strava"
@@ -234,8 +250,7 @@ class StravaService: ObservableObject {
                 }
                 return false
             } else {
-                let responseBody = String(data: data, encoding: .utf8) ?? ""
-                print("Strava: post failed \(statusCode): \(responseBody)")
+                log.error("Strava post failed (\(statusCode))")
                 await MainActor.run {
                     isSyncing = false
                     lastError = "Post failed (\(statusCode))"
@@ -243,31 +258,12 @@ class StravaService: ObservableObject {
                 return false
             }
         } catch {
-            print("Strava: post error: \(error)")
+            log.error("Network error: \(error.localizedDescription)")
             await MainActor.run {
                 isSyncing = false
                 lastError = "Network error"
             }
             return false
-        }
-    }
-
-    // MARK: - Sync Tracking
-
-    func isDaySynced(_ date: Date) -> Bool {
-        let dateStr = Self.dateFormatter.string(from: date)
-        let synced = UserDefaults.standard.stringArray(forKey: syncedDatesKey) ?? []
-        return synced.contains(dateStr)
-    }
-
-    func markDaySynced(_ date: Date) {
-        let dateStr = Self.dateFormatter.string(from: date)
-        var synced = UserDefaults.standard.stringArray(forKey: syncedDatesKey) ?? []
-        if !synced.contains(dateStr) {
-            synced.append(dateStr)
-            // Keep last 90 days only
-            if synced.count > 90 { synced = Array(synced.suffix(90)) }
-            UserDefaults.standard.set(synced, forKey: syncedDatesKey)
         }
     }
 
@@ -306,58 +302,37 @@ class StravaService: ObservableObject {
         )
     }
 
-    // MARK: - Keychain
+    // MARK: - Config Persistence (JSON file — no Keychain prompts)
 
-    private func saveTokens() {
-        if let t = accessToken { saveKeychain(key: "accessToken", value: t) }
-        if let t = refreshToken { saveKeychain(key: "refreshToken", value: t) }
-        if let e = expiresAt {
-            saveKeychain(key: "expiresAt", value: String(e.timeIntervalSince1970))
+    private func saveAllConfig() {
+        let config = StravaConfig(
+            clientId: clientId,
+            clientSecret: clientSecret,
+            accessToken: accessToken,
+            refreshToken: refreshToken,
+            expiresAt: expiresAt?.timeIntervalSince1970
+        )
+        if let data = try? JSONEncoder().encode(config) {
+            FileSystem().save(filename: configFilename, data: data)
         }
     }
 
-    private func loadTokens() {
-        accessToken = loadKeychain(key: "accessToken")
-        refreshToken = loadKeychain(key: "refreshToken")
-        if let expiresStr = loadKeychain(key: "expiresAt"), let interval = Double(expiresStr) {
-            expiresAt = Date(timeIntervalSince1970: interval)
+    private func loadAllConfig() {
+        guard let data = FileSystem().load(filename: configFilename),
+              let config = try? JSONDecoder().decode(StravaConfig.self, from: data) else {
+            return
+        }
+        clientId = config.clientId
+        clientSecret = config.clientSecret
+        accessToken = config.accessToken
+        refreshToken = config.refreshToken
+        if let exp = config.expiresAt {
+            expiresAt = Date(timeIntervalSince1970: exp)
         }
         isConnected = accessToken != nil && refreshToken != nil
     }
 
-    private func saveKeychain(key: String, value: String) {
-        let query: [String: Any] = [
-            kSecClass as String: kSecClassGenericPassword,
-            kSecAttrService as String: keychainService,
-            kSecAttrAccount as String: key,
-            kSecValueData as String: value.data(using: .utf8)!
-        ]
-        SecItemDelete(query as CFDictionary)
-        SecItemAdd(query as CFDictionary, nil)
-    }
-
-    private func loadKeychain(key: String) -> String? {
-        let query: [String: Any] = [
-            kSecClass as String: kSecClassGenericPassword,
-            kSecAttrService as String: keychainService,
-            kSecAttrAccount as String: key,
-            kSecReturnData as String: true,
-            kSecMatchLimit as String: kSecMatchLimitOne
-        ]
-        var ref: AnyObject?
-        let status = SecItemCopyMatching(query as CFDictionary, &ref)
-        if status == errSecSuccess, let data = ref as? Data {
-            return String(data: data, encoding: .utf8)
-        }
-        return nil
-    }
-
-    private func deleteKeychain(key: String) {
-        let query: [String: Any] = [
-            kSecClass as String: kSecClassGenericPassword,
-            kSecAttrService as String: keychainService,
-            kSecAttrAccount as String: key
-        ]
-        SecItemDelete(query as CFDictionary)
+    private func saveTokens() {
+        saveAllConfig()
     }
 }

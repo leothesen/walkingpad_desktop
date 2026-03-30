@@ -179,7 +179,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     private func autoPostToStrava() {
-        guard stravaService.isConnected, !stravaService.isDaySynced(Date()) else {
+        guard stravaService.isConnected, !stravaService.isSyncedToday else {
             print("Strava: auto-post skipped (not connected or already synced)")
             scheduleStravaAutoPostForTomorrow()
             return
@@ -187,7 +187,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
         Task {
             if let sessions = await notionService.fetchTodaySessions(), !sessions.isEmpty {
-                let success = await stravaService.postTodayActivity(sessions: sessions)
+                let success = await stravaService.postTodayActivity(sessions: sessions, notionService: notionService)
                 print("Strava: auto-post \(success ? "succeeded" : "failed")")
             } else {
                 print("Strava: auto-post skipped (no sessions today)")

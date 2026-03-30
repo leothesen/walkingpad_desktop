@@ -107,7 +107,7 @@ struct FooterView: View {
         let notion = notionService
         Task {
             if let sessions = await notion.fetchTodaySessions(), !sessions.isEmpty {
-                await strava.postTodayActivity(sessions: sessions)
+                await strava.postTodayActivity(sessions: sessions, notionService: notion)
             }
         }
     }
