@@ -16,18 +16,16 @@ struct MenuBarPopoverApp: App {
 /// Central orchestrator that wires all services together and manages the app lifecycle.
 ///
 /// Responsibilities:
-/// - Creates and connects all services (BLE, MQTT, HTTP API, health sync)
-/// - Sets up the callback chain: BLE → Workout → StepsUploader / MQTT
+/// - Creates and connects all services (BLE, MQTT, HTTP API, Notion sync)
+/// - Sets up the callback chain: BLE → Workout → Notion / MQTT
 /// - Manages the status bar item and popover UI
 /// - Handles sleep/wake notifications to pause and resume services
 class AppDelegate: NSObject, NSApplicationDelegate {
     private var workout = Workout()
     private var walkingPadService: WalkingPadService
     private var bluetoothDiscoverService: BluetoothDiscoveryService
-    private var stepsUploader: StepsUploader
     private var updateTimer: RepeatingTimer? = nil;
     private var mqttService: MqttService
-    private var hcGatewayService: HCGatewayService
     var notionService: NotionService
 
     var popover: NSPopover!
@@ -37,9 +35,6 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         self.walkingPadService = WalkingPadService()
         self.bluetoothDiscoverService = BluetoothDiscoveryService(walkingPadService)
         self.mqttService = MqttService(FileSystem())
-
-        self.hcGatewayService = HCGatewayService()
-        self.stepsUploader = StepsUploader(hcGatewayService: self.hcGatewayService)
         self.notionService = NotionService()
 
         super.init()
@@ -50,13 +45,6 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             self.workout.resetIfDateChanged()
             self.walkingPadService.command()?.updateStatus()
         })
-
-        // Step upload callback: dispatched to a background queue to avoid blocking BLE callbacks
-        workout.onChangeCallback = {
-            change in DispatchQueue.global(qos: .userInitiated).async {
-                self.stepsUploader.handleChange(change)
-            }
-        }
 
         // Push completed sessions to Notion, then fetch today's total for status bar
         workout.onSessionComplete = { [weak self] session, sessionNumber in
@@ -85,7 +73,6 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             self.mqttService.publish(oldState: oldState, newState: newState, workoutState: self.workout.workoutState())
             // Update status bar after @Published mutations have been dispatched
             DispatchQueue.main.async {
-                // Read distance after the async update in Workout.update() has applied
                 DispatchQueue.main.async {
                     self.updateStatusBarTitle(speed: newState.speed)
                 }
@@ -104,7 +91,6 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         NSLog("Received sleep notification, stopping timer");
         self.updateTimer?.stop();
         self.mqttService.stop()
-        self.stepsUploader.reset()
     }
 
     /// Restarts all services after waking from sleep.
@@ -124,11 +110,10 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             self?.bluetoothDiscoverService.reconnectToKnownPeripheral()
         }
 
-        self.stepsUploader.reset()
         self.workout.resetIfDateChanged()
     }
 
-    /// Sets up the status bar menu item, starts the HTTP API server, and initializes HCGateway auth.
+    /// Sets up the status bar menu item, starts the HTTP API server, and fetches today's stats.
     func applicationDidFinishLaunching(_ aNotification: Notification) {
         // HTTP server runs on a background thread (blocks with loop.runForever())
         DispatchQueue.global(qos: .userInitiated).async {
@@ -138,8 +123,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         // Create the SwiftUI popover hosted inside an NSMenu attached to the status bar icon
         let view = NSHostingView(rootView: ContentView()
                                     .environmentObject(workout)
-                                    .environmentObject(walkingPadService)
-                                    .environmentObject(hcGatewayService))
+                                    .environmentObject(walkingPadService))
         let menuItem = NSMenuItem()
         menuItem.view = view
         view.frame = NSRect(x: 0, y: 0, width: 200, height: 265)
@@ -152,11 +136,6 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         if let button = self.statusBarItem.button {
             button.image = NSImage(named: "StatusIcon")
             button.image?.isTemplate = true
-        }
-
-        // Refresh or validate the HCGateway access token on launch
-        Task {
-            await self.hcGatewayService.initialize()
         }
 
         // Fetch today's total from Notion for the status bar on launch
@@ -192,7 +171,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             button.title = " \(distStr) · \(mins):\(String(format: "%02d", secs))"
             button.image = nil
         } else {
-            // Idle: show today's total from Notion (or local fallback)
+            // Idle: show today's total from Notion
             let totalDist = workout.todayTotalDistance
             if totalDist > 0 {
                 let distStr = totalDist >= 1000 ? String(format: "%.2f km", Double(totalDist) / 1000.0) : "\(totalDist) m"
