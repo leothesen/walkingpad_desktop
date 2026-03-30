@@ -23,11 +23,20 @@ struct DailyPoint: Identifiable {
 class StatsViewModel: ObservableObject {
     @Published var selectedRange: TimeRange = .week
     @Published var hoveredPoint: DailyPoint? = nil
+    @Published var isLoading: Bool = false
+    @Published var dataSource: String = "local"
 
-    let allWorkouts: [WorkoutSaveData]
+    @Published var allWorkouts: [WorkoutSaveData]
 
     init(workouts: [WorkoutSaveData]) {
         self.allWorkouts = workouts
+    }
+
+    /// Replace workout data (e.g., after fetching from Notion) and trigger re-render.
+    func replaceWorkouts(_ workouts: [WorkoutSaveData], source: String = "local") {
+        self.allWorkouts = workouts
+        self.dataSource = source
+        self.isLoading = false
     }
 
     // MARK: - Filtering

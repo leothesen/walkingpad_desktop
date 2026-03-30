@@ -28,6 +28,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     private var updateTimer: RepeatingTimer? = nil;
     private var mqttService: MqttService
     private var hcGatewayService: HCGatewayService
+    var notionService: NotionService
 
     var popover: NSPopover!
     var statusBarItem: NSStatusItem!
@@ -39,6 +40,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
         self.hcGatewayService = HCGatewayService()
         self.stepsUploader = StepsUploader(hcGatewayService: self.hcGatewayService)
+        self.notionService = NotionService()
 
         super.init()
 
@@ -53,6 +55,14 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         workout.onChangeCallback = {
             change in DispatchQueue.global(qos: .userInitiated).async {
                 self.stepsUploader.handleChange(change)
+            }
+        }
+
+        // Push completed sessions to Notion
+        workout.onSessionComplete = { [weak self] session, sessionNumber in
+            guard let notionService = self?.notionService else { return }
+            Task {
+                await notionService.pushSession(session, sessionNumber: sessionNumber)
             }
         }
 

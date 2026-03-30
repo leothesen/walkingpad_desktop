@@ -4,12 +4,14 @@ enum DebugTab: String, CaseIterable {
     case rawData = "Raw Data"
     case bleConsole = "BLE Console"
     case storage = "Storage"
+    case notion = "Notion"
 }
 
-/// Debug panel showing raw workout JSON, live BLE log, and storage info.
+/// Debug panel showing raw workout JSON, live BLE log, storage info, and Notion config.
 struct DebugView: View {
     let workouts: [WorkoutSaveData]
     @ObservedObject var walkingPadService: WalkingPadService
+    @ObservedObject var notionService: NotionService
     @State private var selectedTab: DebugTab = .rawData
 
     private static let timeFormatter: DateFormatter = {
@@ -37,7 +39,100 @@ struct DebugView: View {
                 bleConsoleTab
             case .storage:
                 storageTab
+            case .notion:
+                notionTab
             }
+        }
+    }
+
+    // MARK: - Notion Tab
+
+    @State private var notionApiKey: String = ""
+    @State private var notionDatabaseId: String = "333deabd-9164-80f2-9adf-c79a07bf14d1"
+    @State private var notionTestResult: String? = nil
+    @State private var notionTesting: Bool = false
+
+    private var notionTab: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 12) {
+                // Status
+                HStack {
+                    Image(systemName: notionService.isConfigured ? "checkmark.circle.fill" : "xmark.circle")
+                        .foregroundStyle(notionService.isConfigured ? .green : .secondary)
+                    Text(notionService.isConfigured ? "Connected" : "Not configured")
+                        .font(.callout.weight(.medium))
+                }
+                .padding(10)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 8))
+
+                // API Key
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("API Key")
+                        .font(.caption2)
+                        .foregroundStyle(.tertiary)
+                    SecureField("ntn_...", text: $notionApiKey)
+                        .textFieldStyle(.roundedBorder)
+                        .font(.caption.monospaced())
+                }
+
+                // Database ID
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Database ID")
+                        .font(.caption2)
+                        .foregroundStyle(.tertiary)
+                    TextField("Database ID", text: $notionDatabaseId)
+                        .textFieldStyle(.roundedBorder)
+                        .font(.caption.monospaced())
+                }
+
+                // Buttons
+                HStack(spacing: 8) {
+                    Button("Save") {
+                        guard !notionApiKey.isEmpty, !notionDatabaseId.isEmpty else { return }
+                        notionService.saveConfig(apiKey: notionApiKey, databaseId: notionDatabaseId)
+                        notionApiKey = ""
+                    }
+                    .disabled(notionApiKey.isEmpty || notionDatabaseId.isEmpty)
+
+                    Button("Test") {
+                        notionTesting = true
+                        notionTestResult = nil
+                        Task {
+                            let success = await notionService.testConnection()
+                            await MainActor.run {
+                                notionTestResult = success ? "Connection successful" : "Connection failed"
+                                notionTesting = false
+                            }
+                        }
+                    }
+                    .disabled(!notionService.isConfigured && notionApiKey.isEmpty)
+
+                    if notionService.isConfigured {
+                        Button("Clear") {
+                            notionService.clearConfig()
+                            notionTestResult = nil
+                        }
+                        .foregroundStyle(.red)
+                    }
+
+                    Spacer()
+
+                    if notionTesting {
+                        ProgressView()
+                            .controlSize(.small)
+                    }
+                }
+                .font(.caption)
+
+                // Test result
+                if let result = notionTestResult {
+                    Text(result)
+                        .font(.caption)
+                        .foregroundStyle(result.contains("successful") ? .green : .red)
+                }
+            }
+            .padding(12)
         }
     }
 

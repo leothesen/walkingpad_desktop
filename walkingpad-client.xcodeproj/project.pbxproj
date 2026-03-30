@@ -43,6 +43,7 @@
 		B200000600000000000000BB /* DailyDistanceChart.swift in Sources */ = {isa = PBXBuildFile; fileRef = B200000500000000000000BB /* DailyDistanceChart.swift */; };
 		B200000800000000000000BB /* ActivityHeatmap.swift in Sources */ = {isa = PBXBuildFile; fileRef = B200000700000000000000BB /* ActivityHeatmap.swift */; };
 		C300000200000000000000CC /* DebugView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C300000100000000000000CC /* DebugView.swift */; };
+		D400000200000000000000DD /* NotionService.swift in Sources */ = {isa = PBXBuildFile; fileRef = D400000100000000000000DD /* NotionService.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -83,6 +84,7 @@
 		B200000500000000000000BB /* DailyDistanceChart.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DailyDistanceChart.swift; sourceTree = "<group>"; };
 		B200000700000000000000BB /* ActivityHeatmap.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ActivityHeatmap.swift; sourceTree = "<group>"; };
 		C300000100000000000000CC /* DebugView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DebugView.swift; sourceTree = "<group>"; };
+		D400000100000000000000DD /* NotionService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NotionService.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -187,6 +189,7 @@
 				A100000100000000000000AA /* HCGatewayFacade.swift */,
 				A100000300000000000000AA /* HCGatewayService.swift */,
 				A100000700000000000000AA /* MqttService.swift */,
+				D400000100000000000000DD /* NotionService.swift */,
 				5BA4E9F62649A2E00056CA99 /* StepsUploader.swift */,
 				5B43D84D267F761700A16916 /* RepeatingTimer.swift */,
 				5BA17252263EDB0F0010E483 /* Workout.swift */,
@@ -331,6 +334,7 @@
 			B200000600000000000000BB /* DailyDistanceChart.swift in Sources */,
 			B200000800000000000000BB /* ActivityHeatmap.swift in Sources */,
 			C300000200000000000000CC /* DebugView.swift in Sources */,
+			D400000200000000000000DD /* NotionService.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

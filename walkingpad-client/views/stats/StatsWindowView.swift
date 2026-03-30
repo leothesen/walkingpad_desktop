@@ -6,6 +6,7 @@ import Charts
 struct StatsWindowView: View {
     @StateObject var viewModel: StatsViewModel
     var walkingPadService: WalkingPadService?
+    var notionService: NotionService?
     @State private var showDebug = false
     @State private var hoverFraction: CGFloat = 0.5
 
@@ -30,6 +31,16 @@ struct StatsWindowView: View {
                     .help("Toggle debug panel")
                 }
 
+                // Loading indicator
+                if viewModel.isLoading {
+                    HStack(spacing: 6) {
+                        ProgressView().controlSize(.small)
+                        Text("Loading from Notion…")
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+
                 // 1. Hero: Distance
                 heroDistance
 
@@ -43,16 +54,15 @@ struct StatsWindowView: View {
                 consistencySection
 
                 // 5. Debug panel (expandable)
-                if showDebug {
+                if showDebug, let service = walkingPadService {
                     Divider().opacity(0.3)
-                    if let service = walkingPadService {
-                        DebugView(
-                            workouts: viewModel.allWorkouts,
-                            walkingPadService: service
-                        )
-                        .frame(minHeight: 200)
-                        .transition(.move(edge: .bottom).combined(with: .opacity))
-                    }
+                    DebugView(
+                        workouts: viewModel.allWorkouts,
+                        walkingPadService: service,
+                        notionService: notionService ?? NotionService()
+                    )
+                    .frame(minHeight: 200)
+                    .transition(.move(edge: .bottom).combined(with: .opacity))
                 }
             }
             .padding(16)

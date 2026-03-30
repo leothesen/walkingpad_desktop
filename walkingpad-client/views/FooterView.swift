@@ -40,6 +40,10 @@ struct FooterView: View {
         }
     }
 
+    private var notionService: NotionService? {
+        (NSApp.delegate as? AppDelegate)?.notionService
+    }
+
     private func openStatsWindow() {
         // Close existing window so we always show fresh data
         if let existing = FooterView.statsWindow {
@@ -47,8 +51,14 @@ struct FooterView: View {
             FooterView.statsWindow = nil
         }
 
-        let viewModel = StatsViewModel(workouts: workout.loadAll())
-        let statsView = StatsWindowView(viewModel: viewModel, walkingPadService: walkingPadService)
+        // Start with local data, then try Notion
+        let localWorkouts = workout.loadAll()
+        let viewModel = StatsViewModel(workouts: localWorkouts)
+        let statsView = StatsWindowView(
+            viewModel: viewModel,
+            walkingPadService: walkingPadService,
+            notionService: notionService
+        )
         let hostingView = NSHostingView(rootView: statsView)
 
         let window = NSWindow(
@@ -65,6 +75,24 @@ struct FooterView: View {
         window.makeKeyAndOrderFront(nil)
 
         FooterView.statsWindow = window
+
+        // Fetch from Notion in background, replace data when ready
+        if let notion = notionService, notion.isConfigured {
+            viewModel.isLoading = true
+            Task {
+                if let sessions = await notion.fetchAllSessions() {
+                    let workouts = NotionService.groupSessionsByDate(sessions)
+                    await MainActor.run {
+                        viewModel.replaceWorkouts(workouts, source: "Notion")
+                    }
+                } else {
+                    await MainActor.run {
+                        viewModel.isLoading = false
+                        viewModel.dataSource = "local (Notion unavailable)"
+                    }
+                }
+            }
+        }
     }
 }
 

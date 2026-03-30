@@ -42,8 +42,15 @@ class Workout: ObservableObject {
     private var currentSessionStart: Date? = nil
     private var currentSessionSteps: Int = 0
     private var currentSessionDistance: Int = 0
+    /// Count of consecutive zero-step updates while a session is active.
+    /// Used to detect belt stop even when the treadmill keeps reporting non-zero speed.
+    private var consecutiveZeroStepUpdates: Int = 0
+    private let zeroStepThreshold: Int = 3  // ~12 seconds at 4s polling
 
     public var onChangeCallback: OnChangeCallback =  {_ in }
+
+    /// Called when a session completes (speed → 0). Used to push to Notion.
+    public var onSessionComplete: ((SessionSaveData, Int) -> Void)? = nil
     
     init() {
         self.load()
@@ -57,6 +64,7 @@ class Workout: ObservableObject {
             self.currentSessionStart = nil
             self.currentSessionSteps = 0
             self.currentSessionDistance = 0
+            self.consecutiveZeroStepUpdates = 0
             DispatchQueue.main.async {
                 self.distance = 0
                 self.steps = 0
@@ -107,19 +115,34 @@ class Workout: ObservableObject {
         let wasWalking = oldState.speed > 0
         let isWalking = newState.speed > 0
 
-        if isWalking && !wasWalking {
+        if isWalking && !wasWalking && self.currentSessionStart == nil {
+            print("SESSION START: speed \(oldState.speed) → \(newState.speed)")
             self.currentSessionStart = newState.time
             self.currentSessionSteps = 0
             self.currentSessionDistance = 0
+            self.consecutiveZeroStepUpdates = 0
         }
 
         if self.currentSessionStart != nil {
             self.currentSessionSteps += stepDiff
             self.currentSessionDistance += distanceDiff
+
+            // Track consecutive zero-step updates to detect belt stop
+            if stepDiff == 0 {
+                self.consecutiveZeroStepUpdates += 1
+                print("SESSION IDLE: \(self.consecutiveZeroStepUpdates)/\(self.zeroStepThreshold) zero-step updates, speed=\(newState.speed)")
+            } else {
+                self.consecutiveZeroStepUpdates = 0
+            }
         }
 
+        // End session when: explicit speed→0 transition, OR belt appears stopped
+        // (several consecutive updates with no steps while session is active)
+        let beltStopped = self.currentSessionStart != nil && self.consecutiveZeroStepUpdates >= self.zeroStepThreshold
         var completedSession: SessionSaveData? = nil
-        if wasWalking && !isWalking, let sessionStart = self.currentSessionStart {
+
+        if (wasWalking && !isWalking || beltStopped), let sessionStart = self.currentSessionStart {
+            print("SESSION END: speed \(oldState.speed) → \(newState.speed), steps=\(self.currentSessionSteps), dist=\(self.currentSessionDistance), reason=\(beltStopped ? "idle" : "speed→0")")
             completedSession = SessionSaveData(
                 startTime: sessionStart,
                 endTime: newState.time,
@@ -129,6 +152,7 @@ class Workout: ObservableObject {
             self.currentSessionStart = nil
             self.currentSessionSteps = 0
             self.currentSessionDistance = 0
+            self.consecutiveZeroStepUpdates = 0
         }
 
         // Defer @Published mutations to avoid SwiftUI re-entrancy warnings
@@ -139,8 +163,10 @@ class Workout: ObservableObject {
             self.lastUpdateTime = newState.time
 
             if let session = completedSession {
+                print("SESSION COMPLETE: appending session #\(self.todaySessions.count + 1), steps=\(session.steps), dist=\(session.distance)")
                 self.todaySessions.append(session)
                 self.save()
+                self.onSessionComplete?(session, self.todaySessions.count)
             }
         }
 
