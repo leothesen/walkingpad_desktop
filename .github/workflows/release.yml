@@ -1,0 +1,47 @@
+name: Build and Release
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  build-and-release:
+    runs-on: macos-15
+    permissions:
+      contents: write
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build
+        run: |
+          xcodebuild -scheme walkingpad-client \
+            -configuration Release \
+            -derivedDataPath build \
+            CODE_SIGN_IDENTITY="-" \
+            CODE_SIGNING_ALLOWED=NO
+
+      - name: Package
+        run: |
+          APP_PATH=$(find build -name "*.app" -type d | head -1)
+          echo "Found app at: $APP_PATH"
+          zip -r WalkingPad-Client.zip "$APP_PATH"
+          ls -lh WalkingPad-Client.zip
+
+      - name: Get version
+        id: version
+        run: |
+          echo "tag=v$(date +'%Y.%m.%d.%H%M')" >> $GITHUB_OUTPUT
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.version.outputs.tag }}
+          name: WalkingPad Client ${{ steps.version.outputs.tag }}
+          body: |
+            Automated release from merge to main.
+
+            **Installation**: Download `WalkingPad-Client.zip`, unzip, drag to Applications.
+            On first launch: System Settings → Privacy & Security → "Open Anyway".
+          files: WalkingPad-Client.zip
+          generate_release_notes: true
