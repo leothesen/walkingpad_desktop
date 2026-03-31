@@ -97,17 +97,19 @@ class Workout: ObservableObject {
     
     /// Zeroes daily counters if the date has changed since the last update.
     public func resetIfDateChanged() {
-        if !Calendar.current.isDateInToday(self.lastUpdateTime) && self.steps > 0 {
+        if !Calendar.current.isDateInToday(self.lastUpdateTime) {
             self.currentSessionStart = nil
             self.currentSessionSteps = 0
             self.currentSessionDistance = 0
             self.consecutiveZeroStepUpdates = 0
             self.hasNotifiedForCurrentSession = false
+            self.lastUpdateTime = Date()
             DispatchQueue.main.async {
                 self.distance = 0
                 self.steps = 0
                 self.walkingSeconds = 0
                 self.todaySessions = []
+                self.todayTotalDistance = 0
             }
         }
     }
