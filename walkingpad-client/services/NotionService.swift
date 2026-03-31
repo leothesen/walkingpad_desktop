@@ -211,14 +211,19 @@ class NotionService: ObservableObject {
 
     /// Fetches only today's sessions from Notion (filtered by date).
     func fetchTodaySessions() async -> [SessionSaveData]? {
+        return await fetchSessions(for: Date())
+    }
+
+    /// Fetches sessions for a specific date from Notion.
+    func fetchSessions(for date: Date) async -> [SessionSaveData]? {
         guard let apiKey = apiKey, let databaseId = databaseId else { return nil }
 
-        let todayStr = Self.dateFormatter.string(from: Date())
+        let dateStr = Self.dateFormatter.string(from: date)
         let body: [String: Any] = [
             "page_size": 100,
             "filter": [
                 "property": "Date",
-                "date": ["equals": todayStr]
+                "date": ["equals": dateStr]
             ]
         ]
 
@@ -241,10 +246,10 @@ class NotionService: ObservableObject {
             let sessions = results.filter {
                 !($0["archived"] as? Bool ?? false) && !($0["in_trash"] as? Bool ?? false)
             }.compactMap { parseSession(from: $0) }
-            print("Notion: fetched \(sessions.count) sessions for today (\(todayStr))")
+            print("Notion: fetched \(sessions.count) sessions for \(dateStr)")
             return sessions
         } catch {
-            print("Notion: fetchTodaySessions error: \(error)")
+            print("Notion: fetchSessions error: \(error)")
             return nil
         }
     }

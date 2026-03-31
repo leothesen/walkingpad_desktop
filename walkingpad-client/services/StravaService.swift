@@ -7,6 +7,7 @@ class StravaService: ObservableObject {
     @Published var isSyncedToday: Bool = false
     @Published var isSyncing: Bool = false
     @Published var lastError: String? = nil
+    @Published var yesterdayNeedsSync: Bool = false
 
     private var clientId: String?
     private var clientSecret: String?
@@ -238,6 +239,125 @@ class StravaService: ObservableObject {
                 await MainActor.run {
                     isSyncing = false
                     isSyncedToday = true
+                }
+                return true
+            } else if [401, 403].contains(statusCode) {
+                log.error("Strava auth error (\(statusCode)) — reconnect needed")
+                await MainActor.run {
+                    isSyncing = false
+                    lastError = "Auth error — reconnect Strava"
+                    isConnected = false
+                    disconnect()
+                }
+                return false
+            } else {
+                log.error("Strava post failed (\(statusCode))")
+                await MainActor.run {
+                    isSyncing = false
+                    lastError = "Post failed (\(statusCode))"
+                }
+                return false
+            }
+        } catch {
+            log.error("Network error: \(error.localizedDescription)")
+            await MainActor.run {
+                isSyncing = false
+                lastError = "Network error"
+            }
+            return false
+        }
+    }
+
+    /// Checks whether yesterday had sessions that weren't synced to Strava.
+    func checkYesterdaySync(notionService: NotionService) async {
+        guard isConnected else { return }
+        let yesterday = Calendar.current.date(byAdding: .day, value: -1, to: Date())!
+        let posted = await notionService.isStravaPosted(for: yesterday)
+        if posted {
+            await MainActor.run { yesterdayNeedsSync = false }
+            return
+        }
+        let sessions = await notionService.fetchSessions(for: yesterday)
+        let hasSessions = sessions != nil && !sessions!.isEmpty
+        await MainActor.run { yesterdayNeedsSync = hasSessions }
+        if hasSessions {
+            print("Strava: yesterday has \(sessions!.count) unsynced sessions")
+        }
+    }
+
+    /// Posts yesterday's walking activity to Strava.
+    func postYesterdayActivity(notionService: NotionService) async -> Bool {
+        let yesterday = Calendar.current.date(byAdding: .day, value: -1, to: Date())!
+        guard let sessions = await notionService.fetchSessions(for: yesterday), !sessions.isEmpty else {
+            log.error("No sessions found for yesterday")
+            return false
+        }
+
+        // Check if already posted
+        if let dayTotal = await notionService.fetchDayTotal(for: yesterday), dayTotal.stravaPosted {
+            log.info("Yesterday already posted to Strava")
+            await MainActor.run { yesterdayNeedsSync = false }
+            return true
+        }
+
+        await MainActor.run {
+            isSyncing = true
+            lastError = nil
+        }
+
+        log.progress("Refreshing Strava token…")
+        await refreshTokenIfNeeded()
+        guard let token = accessToken else {
+            log.error("Not authenticated with Strava")
+            await MainActor.run { isSyncing = false; lastError = "Not authenticated" }
+            return false
+        }
+
+        let totalDistance = sessions.reduce(0) { $0 + $1.distance }
+        let totalSteps = sessions.reduce(0) { $0 + $1.steps }
+        let totalSeconds = sessions.reduce(0) { $0 + Int($1.endTime.timeIntervalSince($1.startTime)) }
+        let firstStart = sessions.min(by: { $0.startTime < $1.startTime })!.startTime
+        let distKm = Double(totalDistance) / 1000.0
+        let avgSpeed = totalSeconds > 0 ? (distKm / (Double(totalSeconds) / 3600.0)) : 0
+
+        log.progress("Posting yesterday's \(String(format: "%.1f", distKm))km to Strava (\(sessions.count) sessions)…")
+
+        let iso8601 = ISO8601DateFormatter()
+        iso8601.formatOptions = [.withInternetDateTime]
+
+        let body: [String: Any] = [
+            "name": "Walking while working — \(String(format: "%.1f", distKm))km",
+            "type": "Walk",
+            "sport_type": "Walk",
+            "start_date_local": iso8601.string(from: firstStart),
+            "elapsed_time": totalSeconds,
+            "distance": totalDistance,
+            "description": "Walking treadmill: \(sessions.count) walking session(s) · \(totalSteps) steps · avg \(String(format: "%.1f", avgSpeed)) km/h"
+        ]
+
+        do {
+            var request = URLRequest(url: URL(string: "\(apiURL)/activities")!)
+            request.httpMethod = "POST"
+            request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+            request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+            request.httpBody = try JSONSerialization.data(withJSONObject: body)
+
+            let (data, response) = try await URLSession.shared.data(for: request)
+            let statusCode = (response as? HTTPURLResponse)?.statusCode ?? -1
+
+            if statusCode == 201 {
+                let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any]
+                let activityId = (json?["id"] as? Int).map { String($0) } ?? "unknown"
+
+                log.success("Posted yesterday to Strava! Activity ID: \(activityId)")
+
+                log.progress("Saving day totals to Notion…")
+                let updated = await notionService.upsertDayTotal(date: yesterday, sessions: sessions, stravaActivityId: activityId)
+                log.info("Day totals \(updated ? "saved to Notion" : "failed to save")")
+
+                await MainActor.run {
+                    isSyncing = false
+                    yesterdayNeedsSync = false
                 }
                 return true
             } else if [401, 403].contains(statusCode) {

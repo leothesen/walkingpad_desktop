@@ -119,6 +119,13 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         }
 
         self.workout.resetIfDateChanged()
+
+        // Re-check if yesterday's sessions need syncing (relevant after overnight sleep)
+        Task {
+            if self.notionService.isConfigured {
+                await self.stravaService.checkYesterdaySync(notionService: self.notionService)
+            }
+        }
     }
 
     /// Sets up the status bar menu item, starts the HTTP API server, and fetches today's stats.
@@ -154,15 +161,18 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         // Schedule Strava auto-post at 23:59
         scheduleStravaAutoPost()
 
-        // Fetch today's total from Notion for the status bar on launch
+        // Fetch today's total from Notion for the status bar on launch,
+        // and check if yesterday's sessions need syncing to Strava
         Task {
-            if self.notionService.isConfigured,
-               let sessions = await self.notionService.fetchTodaySessions() {
-                let totalDist = sessions.reduce(0) { $0 + $1.distance }
-                await MainActor.run {
-                    self.workout.todayTotalDistance = totalDist
-                    self.updateStatusBarTitle(speed: 0)
+            if self.notionService.isConfigured {
+                if let sessions = await self.notionService.fetchTodaySessions() {
+                    let totalDist = sessions.reduce(0) { $0 + $1.distance }
+                    await MainActor.run {
+                        self.workout.todayTotalDistance = totalDist
+                        self.updateStatusBarTitle(speed: 0)
+                    }
                 }
+                await self.stravaService.checkYesterdaySync(notionService: self.notionService)
             }
         }
     }
