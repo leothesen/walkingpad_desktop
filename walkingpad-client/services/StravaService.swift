@@ -201,6 +201,7 @@ class StravaService: ObservableObject {
 
         let iso8601 = ISO8601DateFormatter()
         iso8601.formatOptions = [.withInternetDateTime]
+        iso8601.timeZone = TimeZone(identifier: "Africa/Johannesburg")
 
         let body: [String: Any] = [
             "name": "Walking while working — \(String(format: "%.1f", distKm))km",
