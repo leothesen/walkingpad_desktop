@@ -8,6 +8,7 @@ class StravaService: ObservableObject {
     @Published var isSyncing: Bool = false
     @Published var lastError: String? = nil
     @Published var yesterdayNeedsSync: Bool = false
+    @Published var lastStravaSync: Date? = nil
 
     private var clientId: String?
     private var clientSecret: String?
@@ -239,6 +240,7 @@ class StravaService: ObservableObject {
                 await MainActor.run {
                     isSyncing = false
                     isSyncedToday = true
+                    lastStravaSync = Date()
                 }
                 return true
             } else if [401, 403].contains(statusCode) {
@@ -268,9 +270,15 @@ class StravaService: ObservableObject {
         }
     }
 
-    /// Checks whether yesterday had sessions that weren't synced to Strava.
+    /// Checks whether yesterday had sessions that weren't synced to Strava,
+    /// and fetches the most recent Strava sync timestamp.
     func checkYesterdaySync(notionService: NotionService) async {
         guard isConnected else { return }
+
+        // Fetch last sync timestamp
+        let lastSync = await notionService.fetchLastStravaSync()
+        await MainActor.run { lastStravaSync = lastSync }
+
         let yesterday = Calendar.current.date(byAdding: .day, value: -1, to: Date())!
         let posted = await notionService.isStravaPosted(for: yesterday)
         if posted {
@@ -358,6 +366,7 @@ class StravaService: ObservableObject {
                 await MainActor.run {
                     isSyncing = false
                     yesterdayNeedsSync = false
+                    lastStravaSync = Date()
                 }
                 return true
             } else if [401, 403].contains(statusCode) {
