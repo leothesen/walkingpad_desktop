@@ -27,8 +27,8 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     private var bluetoothDiscoverService: BluetoothDiscoveryService
     private var updateTimer: RepeatingTimer? = nil;
     private var mqttService: MqttService
-    var notionService: NotionService
-    var stravaService: StravaService
+    var notionService: NotionService { NotionService.shared }
+    var stravaService: StravaService { StravaService.shared }
 
     var popover: NSPopover!
     var statusBarItem: NSStatusItem!
@@ -37,9 +37,6 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         self.walkingPadService = WalkingPadService()
         self.bluetoothDiscoverService = BluetoothDiscoveryService(walkingPadService)
         self.mqttService = MqttService(FileSystem())
-        self.notionService = NotionService()
-        self.stravaService = StravaService()
-
         super.init()
 
         // Polling timer: requests a status update from the treadmill and checks for date rollover.
@@ -61,7 +58,9 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                 let success = await self.notionService.pushSession(session, sessionNumber: sessionNumber)
                 if success {
                     print("Notion push succeeded, clearing local workout data")
-                    FileSystem().save(filename: "workouts.json", data: try! JSONEncoder().encode(WorkoutsSaveData(workouts: [])))
+                    if let emptyData = try? JSONEncoder().encode(WorkoutsSaveData(workouts: [])) {
+                        FileSystem().save(filename: "workouts.json", data: emptyData)
+                    }
 
                     // Fetch today's total from Notion for the status bar
                     if let sessions = await self.notionService.fetchTodaySessions() {

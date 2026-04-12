@@ -7,15 +7,9 @@ struct FooterView: View {
 
     /// Singleton reference to prevent duplicate stats windows.
     private static var statsWindow: NSWindow?
-    /// Cached NotionService to avoid repeated Keychain reads.
-    private static var _notionService: NotionService?
 
-    private var stravaService: StravaService {
-        if let appDelegate = NSApp.delegate as? AppDelegate {
-            return appDelegate.stravaService
-        }
-        return StravaService()
-    }
+    private var stravaService: StravaService { StravaService.shared }
+    private var notionService: NotionService { NotionService.shared }
 
     var body: some View {
         HStack(spacing: 6) {
@@ -109,20 +103,6 @@ struct FooterView: View {
                 _ = await strava.postTodayActivity(sessions: sessions, notionService: notion)
             }
         }
-    }
-
-    private var notionService: NotionService {
-        // Access via AppDelegate; if cast fails, use a cached standalone instance
-        if let appDelegate = NSApp.delegate as? AppDelegate {
-            return appDelegate.notionService
-        }
-        if let cached = FooterView._notionService {
-            return cached
-        }
-        print("Warning: could not access AppDelegate, creating standalone NotionService")
-        let service = NotionService()
-        FooterView._notionService = service
-        return service
     }
 
     private func openStatsWindow() {
