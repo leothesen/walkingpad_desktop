@@ -1,0 +1,25 @@
+name: CI Build
+
+on:
+  pull_request:
+    branches: [main]
+
+jobs:
+  build:
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Select Xcode
+        run: sudo xcode-select -s /Applications/Xcode_16.3.app
+
+      - name: Resolve packages
+        run: xcodebuild -resolvePackageDependencies -scheme walkingpad-client
+
+      - name: Build (Release)
+        run: |
+          xcodebuild -scheme walkingpad-client \
+            -configuration Release \
+            -destination "platform=macOS,arch=arm64" \
+            CODE_SIGN_IDENTITY="-" \
+            -quiet

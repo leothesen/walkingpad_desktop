@@ -26,6 +26,10 @@
 	<string>$(MACOSX_DEPLOYMENT_TARGET)</string>
 	<key>LSUIElement</key>
 	<true/>
+	<key>SUFeedURL</key>
+	<string>https://raw.githubusercontent.com/leothesen/walkingpad_desktop/main/appcast.xml</string>
+	<key>SUPublicEDKey</key>
+    <string>iIiC1hCpKxreAP1k91BU66Buf4k2HNK7p8WyJuKM/vc=</string>
 	<key>NSBluetoothAlwaysUsageDescription</key>
 	<string>The app requires bluetooth to connect to your treadmill, so to watch your steps.</string>
 	<key>NSBluetoothPeripheralUsageDescription</key>

@@ -1,5 +1,6 @@
 import SwiftUI
 import UserNotifications
+import Sparkle
 
 /// Main app entry point. Uses a Settings scene with an empty view since this is a
 /// menu-bar-only app (LSUIElement = true in Info.plist hides it from the Dock).
@@ -29,6 +30,8 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     private var mqttService: MqttService
     var notionService: NotionService { NotionService.shared }
     var stravaService: StravaService { StravaService.shared }
+
+    private let updaterController = SPUStandardUpdaterController(startingUpdater: false, updaterDelegate: nil, userDriverDelegate: nil)
 
     var popover: NSPopover!
     var statusBarItem: NSStatusItem!
@@ -129,6 +132,9 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
     /// Sets up the status bar menu item, starts the HTTP API server, and fetches today's stats.
     func applicationDidFinishLaunching(_ aNotification: Notification) {
+        // Start Sparkle auto-updater
+        updaterController.startUpdater()
+
         // Request notification permissions
         UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound]) { granted, _ in
             print("Notification permission \(granted ? "granted" : "denied")")
