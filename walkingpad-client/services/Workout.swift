@@ -54,7 +54,7 @@ class Workout: ObservableObject {
     /// Count of consecutive zero-step updates while a session is active.
     /// Used to detect belt stop even when the treadmill keeps reporting non-zero speed.
     private var consecutiveZeroStepUpdates: Int = 0
-    private let zeroStepThreshold: Int = 3  // ~12 seconds at 4s polling
+    private let zeroStepThreshold: Int = 2  // ~8 seconds at 4s polling
 
     /// Idle detection progress shown in the UI (0 when not idle, 1...threshold during detection).
     @Published public var idleProgress: Int = 0

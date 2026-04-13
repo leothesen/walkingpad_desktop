@@ -9,6 +9,7 @@ struct RunningView: View {
     @State private var sliderSpeed: Double = 0
     @State private var isDragging: Bool = false
     @State private var showFinishConfirm: Bool = false
+    @State private var stoppingStartTime: Date?
 
     var body: some View {
         let state = walkingPadService.lastStatus()
@@ -104,20 +105,41 @@ struct RunningView: View {
                     .padding(.vertical, 4)
                     .background(.green.opacity(0.1), in: .capsule)
                 } else {
-                    VStack(spacing: 4) {
-                        Text("Stopping")
-                            .font(.caption2.weight(.medium))
-                            .foregroundStyle(.red)
-                        ProgressView(value: Double(workout.idleProgress), total: 3)
-                            .tint(.red)
+                    TimelineView(.periodic(from: .now, by: 0.25)) { timeline in
+                        let elapsed = stoppingStartTime.map { timeline.date.timeIntervalSince($0) } ?? 0
+                        let idle = workout.idleProgress
+                        let progress: Double = {
+                            if idle >= 1 {
+                                // After first idle: fast fill from 1.0→2.0 over ~4s
+                                let sinceFirstIdle = max(elapsed - 10.0, 0)
+                                return 1.0 + min(sinceFirstIdle / 4.1, 1.0)
+                            } else {
+                                // Before first idle: slow fill 0→1.0 over 10s, then wait at 1.0
+                                return min(elapsed / 10.0, 1.0)
+                            }
+                        }()
+
+                        VStack(spacing: 4) {
+                            Text("Stopping")
+                                .font(.caption2.weight(.medium))
+                                .foregroundStyle(.red)
+                            ProgressView(value: min(progress, 2.0), total: 2)
+                                .tint(.red)
+                        }
                     }
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 4)
                     .padding(.horizontal, 8)
                     .background(.red.opacity(0.1), in: .capsule)
+                    .onAppear {
+                        if stoppingStartTime == nil {
+                            stoppingStartTime = Date()
+                        }
+                    }
                 }
             } else {
                 Button(action: {
+                    stoppingStartTime = Date()
                     workout.isStopping = true
                     walkingPadService.command()?.setSpeed(speed: 0)
                 }) {
@@ -186,6 +208,7 @@ struct RunningView: View {
     }
 
     private func stopAndFinishDay() {
+        stoppingStartTime = Date()
         workout.isStopping = true
         walkingPadService.command()?.setSpeed(speed: 0)
 
