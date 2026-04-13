@@ -209,6 +209,7 @@ class StravaService: ObservableObject {
             "start_date_local": iso8601.string(from: firstStart),
             "elapsed_time": totalSeconds,
             "distance": totalDistance,
+            "steps": totalSteps,
             "description": "Walking treadmill: \(sessions.count) walking session(s) · \(totalSteps) steps · avg \(String(format: "%.1f", avgSpeed)) km/h"
         ]
 
