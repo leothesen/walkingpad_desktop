@@ -81,6 +81,7 @@ struct StatsWindowView: View {
                 }
             }
             .padding(16)
+            .frame(minWidth: 460, minHeight: 400)
     }
 
     // MARK: - Hero Distance
