@@ -101,7 +101,7 @@ jobs:
             --title "WalkingPad Client ${{ steps.version.outputs.version }}" \
             --generate-notes
 
-      - name: Update appcast on main
+      - name: Update appcast and version on main
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
@@ -109,7 +109,10 @@ jobs:
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git fetch origin main
           git checkout main
+          # Update version in project file
+          sed -i '' "s/MARKETING_VERSION = .*;/MARKETING_VERSION = ${{ steps.version.outputs.version }};/g" \
+            walkingpad-client.xcodeproj/project.pbxproj
           cp appcast.xml appcast.xml
-          git add appcast.xml
-          git commit -m "chore: update appcast for v${{ steps.version.outputs.version }}"
+          git add appcast.xml walkingpad-client.xcodeproj/project.pbxproj
+          git commit -m "chore: update version and appcast for v${{ steps.version.outputs.version }}"
           git push origin main
