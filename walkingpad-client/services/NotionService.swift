@@ -15,21 +15,26 @@ class NotionService: ObservableObject {
     private var apiKey: String?
     private var databaseId: String?
 
+    private static let saTimeZone = TimeZone(identifier: "Africa/Johannesburg")!
+
     private static let dateFormatter: DateFormatter = {
         let f = DateFormatter()
         f.dateFormat = "yyyy-MM-dd"
+        f.timeZone = saTimeZone
         return f
     }()
 
     private static let timeFormatter: DateFormatter = {
         let f = DateFormatter()
         f.dateFormat = "HH:mm:ss"
+        f.timeZone = saTimeZone
         return f
     }()
 
     private static let titleDateFormatter: DateFormatter = {
         let f = DateFormatter()
         f.dateFormat = "MMM d"
+        f.timeZone = saTimeZone
         return f
     }()
 
@@ -321,6 +326,7 @@ class NotionService: ObservableObject {
         let combined = Self.dateFormatter.string(from: date) + " " + timeStr
         let formatter = DateFormatter()
         formatter.dateFormat = "yyyy-MM-dd HH:mm:ss"
+        formatter.timeZone = TimeZone(identifier: "Africa/Johannesburg")
         return formatter.date(from: combined)
     }
 
@@ -387,6 +393,7 @@ class NotionService: ObservableObject {
         if let activityId = stravaActivityId {
             let timeFormatter = DateFormatter()
             timeFormatter.dateFormat = "HH:mm:ss"
+            timeFormatter.timeZone = Self.saTimeZone
             properties["Strava Posted At"] = ["rich_text": [["text": ["content": timeFormatter.string(from: Date())]]]]
             properties["Strava Activity ID"] = ["rich_text": [["text": ["content": activityId]]]]
         }
