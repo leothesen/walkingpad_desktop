@@ -67,14 +67,14 @@ open class WalkingPadService: NSObject, CBPeripheralDelegate, ObservableObject {
         self.connection?.peripheral.delegate = self
         connection.peripheral.setNotifyValue(true, for: connection.notifyCharacteristic)
         let name = connection.peripheral.name ?? "unknown"
-        print("Initialized walking pad connection to \(name)")
+        appLog("Initialized walking pad connection to \(name)")
         log("Connected to \(name)")
     }
 
     /// Called on BLE disconnect. Fires a zero-speed callback to trigger upload/save
     /// logic that depends on the treadmill stopping, then clears state.
     public func onDisconnect() {
-        print("WalkingPad device disconnected, setting state to nil")
+        appLog("WalkingPad device disconnected, setting state to nil")
         log("Disconnected")
         self.notifyZeroSpeed()
         DispatchQueue.main.async {
@@ -86,7 +86,7 @@ open class WalkingPadService: NSObject, CBPeripheralDelegate, ObservableObject {
     /// This ensures the StepsUploader detects a "treadmill stopped" transition on disconnect.
     private func notifyZeroSpeed() {
         guard let state = self.lastState else { return }
-        print("Notifying with zero speed.")
+        appLog("Notifying with zero speed.")
         self.callback?(state, DeviceState(
             time: Date(),
             walkingTimeSeconds: state.walkingTimeSeconds,
@@ -148,7 +148,7 @@ open class WalkingPadService: NSObject, CBPeripheralDelegate, ObservableObject {
             // Need at least 14 bytes to read steps at index 11-13
             if (byteArray.count < 13) {
                 log("⚠ Short payload: \(byteArray.count) bytes")
-                print("Unknown status array length")
+                appLog("Unknown status array length")
                 return
             }
 

@@ -72,7 +72,7 @@ class StravaService: ObservableObject {
     func startOAuthFlow() {
         guard isClientConfigured, let clientId = clientId else {
             lastError = "Client ID/Secret not configured — set in debug panel"
-            print("Strava: credentials not configured — use debug panel")
+            appLog("Strava: credentials not configured — use debug panel")
             return
         }
 
@@ -89,7 +89,7 @@ class StravaService: ObservableObject {
         let urlString = "\(baseURL)/oauth/authorize?client_id=\(clientId)&response_type=code&redirect_uri=\(redirectURI)&scope=\(scope)&approval_prompt=auto"
         if let url = URL(string: urlString) {
             NSWorkspace.shared.open(url)
-            print("Strava: opened browser for OAuth")
+            appLog("Strava: opened browser for OAuth")
         }
     }
 
@@ -112,12 +112,12 @@ class StravaService: ObservableObject {
                 self.isConnected = true
                 self.lastError = nil
                 self.saveTokens()
-                print("Strava: authenticated successfully")
+                appLog("Strava: authenticated successfully")
             }
         } catch {
             await MainActor.run {
                 self.lastError = "Auth failed: \(error.localizedDescription)"
-                print("Strava: token exchange failed: \(error)")
+                appLog("Strava: token exchange failed: \(error)")
             }
         }
     }
@@ -142,13 +142,13 @@ class StravaService: ObservableObject {
                 self.refreshToken = result.refreshToken
                 self.expiresAt = result.expiresAt
                 self.saveTokens()
-                print("Strava: token refreshed")
+                appLog("Strava: token refreshed")
             }
         } catch {
             await MainActor.run {
                 self.lastError = "Token refresh failed"
                 self.isConnected = false
-                print("Strava: refresh failed: \(error)")
+                appLog("Strava: refresh failed: \(error)")
             }
         }
     }
@@ -161,7 +161,7 @@ class StravaService: ObservableObject {
         isConnected = false
         isSyncedToday = false
         saveAllConfig()
-        print("Strava: disconnected")
+        appLog("Strava: disconnected")
     }
 
     // MARK: - Post Activity
@@ -324,7 +324,7 @@ class StravaService: ObservableObject {
             }
         }
         if hasSessions {
-            print("Strava: yesterday has \(sessions!.count) unsynced sessions")
+            appLog("Strava: yesterday has \(sessions!.count) unsynced sessions")
         }
 
         // Also check today if not synced

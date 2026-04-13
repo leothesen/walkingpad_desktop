@@ -31,7 +31,7 @@ open class BluetoothDiscoveryService: NSObject, CBCentralManagerDelegate, Observ
 
         // queue: nil means callbacks arrive on the main thread
         self.centralManager = CBCentralManager(delegate: self, queue: nil)
-        print("Central Manager State: \(self.centralManager.state)")
+        appLog("Central Manager State: \(self.centralManager.state)")
 
         // Kick off scanning after a short delay to handle cases where BT is already powered on
         DispatchQueue.main.asyncAfter(deadline: .now() + 1) {
@@ -50,7 +50,7 @@ open class BluetoothDiscoveryService: NSObject, CBCentralManagerDelegate, Observ
     /// Starts or stops scanning based on Bluetooth power state.
     public func centralManagerDidUpdateState(_ central: CBCentralManager) {
         if (central.state == .poweredOn) {
-            print("Scanning for devices");
+            appLog("Scanning for devices");
             self.centralManager.scanForPeripherals(withServices: BluetoothPeripheral.walkingPadServiceUUIDs, options: nil)
         } else {
             self.centralManager.stopScan()
@@ -100,7 +100,7 @@ open class BluetoothDiscoveryService: NSObject, CBCentralManagerDelegate, Observ
 
     /// Auto-restarts scanning when a device disconnects.
     public func centralManager(_ central: CBCentralManager, didDisconnectPeripheral peripheral: CBPeripheral, error: Error?) {
-        print("Device is disconnected, starting scan again.")
+        appLog("Device is disconnected, starting scan again.")
         if (self.walkingPadService.isCurrentDevice(peripheral: peripheral)) {
             self.walkingPadService.onDisconnect()
         }

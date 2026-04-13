@@ -89,7 +89,7 @@ class Workout: ObservableObject {
             trigger: nil
         )
         UNUserNotificationCenter.current().add(request)
-        print("60-min walking notification sent, reducing speed to 1.5 km/h")
+        appLog("60-min walking notification sent, reducing speed to 1.5 km/h")
 
         // Nudge: slow the treadmill to 1.5 km/h to encourage stopping
         onSpeedNudge?(15)
@@ -137,14 +137,14 @@ class Workout: ObservableObject {
             save()
         }
 
-        print("adding steps=\(stepDiff) distance=\(distanceDiff)")
+        appLog("adding steps=\(stepDiff) distance=\(distanceDiff)")
 
         // Session tracking (non-published state, safe to update synchronously)
         let wasWalking = oldState.speed > 0
         let isWalking = newState.speed > 0
 
         if isWalking && !wasWalking && self.currentSessionStart == nil {
-            print("SESSION START: speed \(oldState.speed) → \(newState.speed)")
+            appLog("SESSION START: speed \(oldState.speed) → \(newState.speed)")
             self.currentSessionStart = newState.time
             self.currentSessionSteps = 0
             self.currentSessionDistance = 0
@@ -155,7 +155,7 @@ class Workout: ObservableObject {
         // Also start a session if we're getting steps but no session is active
         // (happens when treadmill was already moving on first valid state pair)
         if isWalking && stepDiff > 0 && self.currentSessionStart == nil {
-            print("SESSION START (mid-walk): speed=\(newState.speed), steps already flowing")
+            appLog("SESSION START (mid-walk): speed=\(newState.speed), steps already flowing")
             self.currentSessionStart = newState.time
             self.currentSessionSteps = 0
             self.currentSessionDistance = 0
@@ -173,7 +173,7 @@ class Workout: ObservableObject {
             // Track consecutive zero-step updates to detect belt stop
             if stepDiff == 0 {
                 self.consecutiveZeroStepUpdates += 1
-                print("SESSION IDLE: \(self.consecutiveZeroStepUpdates)/\(self.zeroStepThreshold) zero-step updates, speed=\(newState.speed)")
+                appLog("SESSION IDLE: \(self.consecutiveZeroStepUpdates)/\(self.zeroStepThreshold) zero-step updates, speed=\(newState.speed)")
             } else {
                 self.consecutiveZeroStepUpdates = 0
             }
@@ -185,7 +185,7 @@ class Workout: ObservableObject {
         var completedSession: SessionSaveData? = nil
 
         if (wasWalking && !isWalking || beltStopped), let sessionStart = self.currentSessionStart {
-            print("SESSION END: speed \(oldState.speed) → \(newState.speed), steps=\(self.currentSessionSteps), dist=\(self.currentSessionDistance), reason=\(beltStopped ? "idle" : "speed→0")")
+            appLog("SESSION END: speed \(oldState.speed) → \(newState.speed), steps=\(self.currentSessionSteps), dist=\(self.currentSessionDistance), reason=\(beltStopped ? "idle" : "speed→0")")
             completedSession = SessionSaveData(
                 startTime: sessionStart,
                 endTime: newState.time,
@@ -211,7 +211,7 @@ class Workout: ObservableObject {
             self.sessionDistance = self.currentSessionDistance
 
             if let session = completedSession {
-                print("SESSION COMPLETE: appending session #\(self.todaySessions.count + 1), steps=\(session.steps), dist=\(session.distance)")
+                appLog("SESSION COMPLETE: appending session #\(self.todaySessions.count + 1), steps=\(session.steps), dist=\(session.distance)")
                 self.todaySessions.append(session)
                 self.sessionSteps = 0
                 self.sessionDistance = 0
@@ -241,7 +241,7 @@ class Workout: ObservableObject {
             let json = try jsonEncoder.encode(WorkoutsSaveData(workouts: newData))
             FileSystem().save(filename: "workouts.json", data: json)
         } catch {
-            print("could not save")
+            appLog("could not save")
         }
     }
     
@@ -273,7 +273,7 @@ class Workout: ObservableObject {
             }
             return []
         } catch {
-            print("Could not load workout data \(error)")
+            appLog("Could not load workout data \(error)")
             return []
         }
     }

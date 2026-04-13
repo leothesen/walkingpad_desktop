@@ -191,9 +191,9 @@ struct FooterView: View {
             Task {
                 if let sessions = await notion.fetchAllSessions() {
                     let workouts = NotionService.groupSessionsByDate(sessions)
-                    print("Stats: replacing with \(workouts.count) days from Notion (\(sessions.count) sessions)")
+                    appLog("Stats: replacing with \(workouts.count) days from Notion (\(sessions.count) sessions)")
                     for w in workouts {
-                        print("  Day: \(w.date), steps=\(w.steps), dist=\(w.distance), sessions=\(w.sessions?.count ?? 0)")
+                        appLog("  Day: \(w.date), steps=\(w.steps), dist=\(w.distance), sessions=\(w.sessions?.count ?? 0)")
                     }
                     await MainActor.run {
                         viewModel.replaceWorkouts(workouts, source: "Notion")

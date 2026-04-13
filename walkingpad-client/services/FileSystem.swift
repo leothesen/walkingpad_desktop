@@ -16,21 +16,21 @@ class FileSystem {
     
     public func save(filename: String, data: Data) {
         let path = self.getDirectory().appendingPathComponent(filename)
-        print("saving to \(path)")
+        appLog("saving to \(path)")
         do {
             try data.write(to: path)
         } catch {
-            print("Failed to write to \(path): \(error)")
+            appLog("Failed to write to \(path): \(error)")
         }
     }
     
     public func load(filename: String) -> Data? {
         let path = self.getDirectory().appendingPathComponent(filename)
-        print("loading from \(path)")
+        appLog("loading from \(path)")
         do {
             return try Data(contentsOf: path)
         } catch {
-            print("Failed to load from \(path): \(error)")
+            appLog("Failed to load from \(path): \(error)")
             return nil
         }
     }

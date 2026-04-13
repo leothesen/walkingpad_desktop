@@ -91,7 +91,7 @@ class NotionService: ObservableObject {
     /// Queries existing sessions for the day to determine the correct session number.
     func pushSession(_ sessionData: SessionSaveData, sessionNumber: Int) async -> Bool {
         guard let apiKey = apiKey, let databaseId = databaseId else {
-            print("Notion: not configured, skipping push")
+            appLog("Notion: not configured, skipping push")
             return false
         }
 
@@ -129,16 +129,16 @@ class NotionService: ObservableObject {
             let (data, response) = try await session.data(for: request)
 
             if let httpResponse = response as? HTTPURLResponse, httpResponse.statusCode == 200 {
-                print("Notion: session pushed successfully")
+                appLog("Notion: session pushed successfully")
                 return true
             } else {
                 let statusCode = (response as? HTTPURLResponse)?.statusCode ?? -1
                 let responseBody = String(data: data, encoding: .utf8) ?? ""
-                print("Notion: push failed with status \(statusCode): \(responseBody)")
+                appLog("Notion: push failed with status \(statusCode): \(responseBody)")
                 return false
             }
         } catch {
-            print("Notion: push error: \(error)")
+            appLog("Notion: push error: \(error)")
             return false
         }
     }
@@ -176,13 +176,13 @@ class NotionService: ObservableObject {
 
                 guard let httpResponse = response as? HTTPURLResponse, httpResponse.statusCode == 200 else {
                     let statusCode = (response as? HTTPURLResponse)?.statusCode ?? -1
-                    print("Notion: fetch failed with status \(statusCode)")
+                    appLog("Notion: fetch failed with status \(statusCode)")
                     return nil
                 }
 
                 guard let json = try JSONSerialization.jsonObject(with: data) as? [String: Any],
                       let results = json["results"] as? [[String: Any]] else {
-                    print("Notion: failed to parse response")
+                    appLog("Notion: failed to parse response")
                     return nil
                 }
 
@@ -193,7 +193,7 @@ class NotionService: ObservableObject {
                     if archived || inTrash {
                         let title = ((page["properties"] as? [String: Any])?["Session"] as? [String: Any])?["title"] as? [[String: Any]]
                         let name = (title?.first?["plain_text"] as? String) ?? "unknown"
-                        print("Notion: skipping archived/trashed page: \(name)")
+                        appLog("Notion: skipping archived/trashed page: \(name)")
                         continue
                     }
                     if let session = parseSession(from: page) {
@@ -204,14 +204,14 @@ class NotionService: ObservableObject {
                 hasMore = json["has_more"] as? Bool ?? false
                 nextCursor = json["next_cursor"] as? String
             } catch {
-                print("Notion: fetch error: \(error)")
+                appLog("Notion: fetch error: \(error)")
                 return nil
             }
         }
 
-        print("Notion: fetched \(allSessions.count) sessions")
+        appLog("Notion: fetched \(allSessions.count) sessions")
         for (i, s) in allSessions.enumerated() {
-            print("  Notion session \(i): start=\(s.startTime) end=\(s.endTime) steps=\(s.steps) dist=\(s.distance)")
+            appLog("  Notion session \(i): start=\(s.startTime) end=\(s.endTime) steps=\(s.steps) dist=\(s.distance)")
         }
         return allSessions
     }
@@ -253,10 +253,10 @@ class NotionService: ObservableObject {
             let sessions = results.filter {
                 !($0["archived"] as? Bool ?? false) && !($0["in_trash"] as? Bool ?? false)
             }.compactMap { parseSession(from: $0) }
-            print("Notion: fetched \(sessions.count) sessions for \(dateStr)")
+            appLog("Notion: fetched \(sessions.count) sessions for \(dateStr)")
             return sessions
         } catch {
-            print("Notion: fetchSessions error: \(error)")
+            appLog("Notion: fetchSessions error: \(error)")
             return nil
         }
     }
@@ -372,7 +372,7 @@ class NotionService: ObservableObject {
             }
             return (exists: false, stravaPosted: false, pageId: nil)
         } catch {
-            print("Notion: fetchDayTotal error: \(error)")
+            appLog("Notion: fetchDayTotal error: \(error)")
             return nil
         }
     }
@@ -418,10 +418,10 @@ class NotionService: ObservableObject {
 
                 let (_, response) = try await session.data(for: request)
                 let success = (response as? HTTPURLResponse)?.statusCode == 200
-                print("Notion: day total updated: \(success)")
+                appLog("Notion: day total updated: \(success)")
                 return success
             } catch {
-                print("Notion: day total update error: \(error)")
+                appLog("Notion: day total update error: \(error)")
                 return false
             }
         } else {
@@ -440,10 +440,10 @@ class NotionService: ObservableObject {
 
                 let (_, response) = try await session.data(for: request)
                 let success = (response as? HTTPURLResponse)?.statusCode == 200
-                print("Notion: day total created: \(success)")
+                appLog("Notion: day total created: \(success)")
                 return success
             } catch {
-                print("Notion: day total create error: \(error)")
+                appLog("Notion: day total create error: \(error)")
                 return false
             }
         }
@@ -491,7 +491,7 @@ class NotionService: ObservableObject {
             }
             return nil
         } catch {
-            print("Notion: fetchLastStravaSync error: \(error)")
+            appLog("Notion: fetchLastStravaSync error: \(error)")
             return nil
         }
     }
@@ -510,7 +510,7 @@ extension NotionService {
             grouped[components, default: []].append(session)
         }
 
-        print("Notion: grouping \(sessions.count) sessions into \(grouped.count) days")
+        appLog("Notion: grouping \(sessions.count) sessions into \(grouped.count) days")
         return grouped.compactMap { (components, daySessions) -> WorkoutSaveData? in
             guard let date = calendar.date(from: components) else { return nil }
             let totalSteps = daySessions.reduce(0) { $0 + $1.steps }
