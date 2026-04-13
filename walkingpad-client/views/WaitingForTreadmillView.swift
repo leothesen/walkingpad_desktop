@@ -11,6 +11,6 @@ struct WaitingForTreadmillView: View {
         }
         .frame(maxWidth: .infinity)
         .padding(.vertical, 20)
-        .glassEffect(.regular, in: .rect(cornerRadius: 10))
+        .background(.ultraThinMaterial, in: .rect(cornerRadius: 10))
     }
 }

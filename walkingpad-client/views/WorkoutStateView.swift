@@ -43,6 +43,6 @@ struct WorkoutStateView: View {
         }
         .frame(maxWidth: .infinity)
         .padding(.vertical, 6)
-        .glassEffect(.regular, in: .rect(cornerRadius: 10))
+        .background(.ultraThinMaterial, in: .rect(cornerRadius: 10))
     }
 }

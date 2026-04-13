@@ -33,7 +33,7 @@ struct RunningView: View {
                             .contentShape(Circle())
                     }
                     .buttonStyle(.plain)
-                    .glassEffect(.regular.interactive(), in: .circle)
+                    .background(.ultraThinMaterial, in: .circle)
 
                     Slider(value: $sliderSpeed, in: 0.5...8.0, step: 0.5) {
                         SwiftUI.EmptyView()
@@ -51,13 +51,13 @@ struct RunningView: View {
                             .contentShape(Circle())
                     }
                     .buttonStyle(.plain)
-                    .glassEffect(.regular.interactive(), in: .circle)
+                    .background(.ultraThinMaterial, in: .circle)
                 }
                 .padding(.top, 2)
             }
             .padding(.horizontal, 10)
             .padding(.vertical, 6)
-            .glassEffect(.regular, in: .rect(cornerRadius: 10))
+            .background(.ultraThinMaterial, in: .rect(cornerRadius: 10))
 
             // Mode + Stop row
             HStack(spacing: 6) {
@@ -78,7 +78,7 @@ struct RunningView: View {
             }
             .buttonStyle(.plain)
             .padding(.vertical, 4)
-            .glassEffect(.regular.tint(.red.opacity(0.1)).interactive(), in: .capsule)
+            .background(.red.opacity(0.1), in: .capsule)
 
             if showFinishConfirm {
                 HStack(spacing: 6) {
@@ -94,7 +94,7 @@ struct RunningView: View {
                     }
                     .buttonStyle(.plain)
                     .padding(.vertical, 3)
-                    .glassEffect(.regular.interactive(), in: .capsule)
+                    .background(.ultraThinMaterial, in: .capsule)
 
                     Button(action: {
                         showFinishConfirm = false
@@ -108,7 +108,7 @@ struct RunningView: View {
                     }
                     .buttonStyle(.plain)
                     .padding(.vertical, 3)
-                    .glassEffect(.regular.tint(.orange.opacity(0.1)).interactive(), in: .capsule)
+                    .background(.orange.opacity(0.1), in: .capsule)
                 }
             } else {
                 Button(action: { showFinishConfirm = true }) {
@@ -120,7 +120,7 @@ struct RunningView: View {
                 }
                 .buttonStyle(.plain)
                 .padding(.vertical, 3)
-                .glassEffect(.regular.tint(.orange.opacity(0.1)).interactive(), in: .capsule)
+                .background(.orange.opacity(0.1), in: .capsule)
             }
         }
         .onAppear { sliderSpeed = max(currentSpeed, 0.5) }
@@ -200,9 +200,6 @@ struct RunningView: View {
         }
         .buttonStyle(.plain)
         .padding(.vertical, 4)
-        .glassEffect(
-            mode == current ? .regular.tint(.accentColor).interactive() : .regular.interactive(),
-            in: .capsule
-        )
+        .background(mode == current ? AnyShapeStyle(.tint) : AnyShapeStyle(.ultraThinMaterial), in: .capsule)
     }
 }

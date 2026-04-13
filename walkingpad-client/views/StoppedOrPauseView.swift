@@ -22,7 +22,7 @@ struct StoppedOrPausedView: View {
             }
             .buttonStyle(.plain)
             .padding(.vertical, 4)
-            .glassEffect(.regular.tint(.green.opacity(0.1)).interactive(), in: .capsule)
+            .background(.green.opacity(0.1), in: .capsule)
 
             if showYesterdaySync {
                 if showYesterdayConfirm {
@@ -39,7 +39,7 @@ struct StoppedOrPausedView: View {
                         .buttonStyle(.plain)
                         .padding(.horizontal, 8)
                         .padding(.vertical, 3)
-                        .glassEffect(.regular.interactive(), in: .capsule)
+                        .background(.ultraThinMaterial, in: .capsule)
 
                         Button(action: {
                             showYesterdayConfirm = false
@@ -53,7 +53,7 @@ struct StoppedOrPausedView: View {
                         .buttonStyle(.plain)
                         .padding(.horizontal, 8)
                         .padding(.vertical, 3)
-                        .glassEffect(.regular.tint(.orange.opacity(0.1)).interactive(), in: .capsule)
+                        .background(.orange.opacity(0.1), in: .capsule)
                     }
                 } else {
                     Button(action: {
@@ -74,7 +74,7 @@ struct StoppedOrPausedView: View {
                     }
                     .buttonStyle(.plain)
                     .padding(.vertical, 3)
-                    .glassEffect(.regular.tint(.orange.opacity(0.1)).interactive(), in: .capsule)
+                    .background(.orange.opacity(0.1), in: .capsule)
                     .disabled(isSyncingYesterday)
                 }
             }

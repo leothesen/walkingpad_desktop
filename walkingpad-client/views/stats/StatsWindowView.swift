@@ -12,8 +12,7 @@ struct StatsWindowView: View {
     @State private var hoverFraction: CGFloat = 0.5
 
     var body: some View {
-        GlassEffectContainer {
-            VStack(spacing: 14) {
+        VStack(spacing: 14) {
                 // Time range selector + debug toggle
                 HStack {
                     Picker("Range", selection: $viewModel.selectedRange.animation(.spring(duration: 0.35))) {
@@ -73,7 +72,6 @@ struct StatsWindowView: View {
                 }
             }
             .padding(16)
-        }
     }
 
     // MARK: - Hero Distance
@@ -120,7 +118,7 @@ struct StatsWindowView: View {
             )
             .frame(height: 140)
             .padding(12)
-            .glassEffect(.regular, in: .rect(cornerRadius: 14))
+            .background(.ultraThinMaterial, in: .rect(cornerRadius: 14))
         }
     }
 
@@ -168,7 +166,7 @@ struct StatsWindowView: View {
             workouts: viewModel.filteredWorkouts
         )
         .padding(12)
-        .glassEffect(.regular, in: .rect(cornerRadius: 14))
+        .background(.ultraThinMaterial, in: .rect(cornerRadius: 14))
     }
 }
 
@@ -196,6 +194,6 @@ struct MetricCard: View {
         }
         .frame(maxWidth: .infinity)
         .padding(.vertical, 10)
-        .glassEffect(.regular, in: .rect(cornerRadius: 10))
+        .background(.ultraThinMaterial, in: .rect(cornerRadius: 10))
     }
 }
