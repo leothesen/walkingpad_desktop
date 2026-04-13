@@ -55,6 +55,7 @@ jobs:
       - name: Generate appcast
         env:
           SPARKLE_PRIVATE_KEY: ${{ secrets.SPARKLE_PRIVATE_KEY }}
+        shell: bash
         run: |
           # Download Sparkle tools
           SPARKLE_VERSION="2.6.4"
@@ -66,11 +67,16 @@ jobs:
           PUB_DATE=$(date -R)
           VERSION="${{ steps.version.outputs.version }}"
 
+          # Write private key to a temp file for sign_update
+          KEY_FILE=$(mktemp)
+          echo "$SPARKLE_PRIVATE_KEY" > "$KEY_FILE"
+
           # Generate EdDSA signature
-          SIGNATURE=$(/tmp/bin/sign_update WalkingPad-Client.zip -f <(echo "$SPARKLE_PRIVATE_KEY"))
+          SIGNATURE=$(/tmp/bin/sign_update WalkingPad-Client.zip -f "$KEY_FILE")
+          rm -f "$KEY_FILE"
 
           # Generate appcast.xml
-          cat > appcast.xml << APPCAST_EOF
+          cat > appcast.xml <<EOF
           <?xml version="1.0" encoding="utf-8"?>
           <rss version="2.0" xmlns:sparkle="http://www.andymatuschak.org/xml-namespaces/sparkle" xmlns:dc="http://purl.org/dc/elements/1.1/">
             <channel>
@@ -90,16 +96,22 @@ jobs:
               </item>
             </channel>
           </rss>
-          APPCAST_EOF
+          EOF
 
-      - name: Create GitHub Release
+      - name: Create or update GitHub Release
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release create "$GITHUB_REF_NAME" \
-            WalkingPad-Client.zip \
-            --title "WalkingPad Client ${{ steps.version.outputs.version }}" \
-            --generate-notes
+          if gh release view "$GITHUB_REF_NAME" &>/dev/null; then
+            # Release already exists (created manually) — upload the asset
+            gh release upload "$GITHUB_REF_NAME" WalkingPad-Client.zip --clobber
+          else
+            # Create new release
+            gh release create "$GITHUB_REF_NAME" \
+              WalkingPad-Client.zip \
+              --title "WalkingPad Client ${{ steps.version.outputs.version }}" \
+              --generate-notes
+          fi
 
       - name: Update appcast and version on main
         env:
