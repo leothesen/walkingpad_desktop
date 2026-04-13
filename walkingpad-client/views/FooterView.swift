@@ -183,6 +183,7 @@ struct FooterView: View {
         window.isReleasedWhenClosed = false
         window.minSize = NSSize(width: 400, height: 400)
         window.makeKeyAndOrderFront(nil)
+        NSApp.activate()
 
         FooterView.statsWindow = window
 
