@@ -96,21 +96,6 @@ jobs:
           echo "Generated appcast.xml:"
           cat appcast.xml
 
-      - name: Create or update GitHub Release
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          if gh release view "$GITHUB_REF_NAME" &>/dev/null; then
-            # Release already exists (created manually) — upload the asset
-            gh release upload "$GITHUB_REF_NAME" WalkingPad-Client.zip --clobber
-          else
-            # Create new release
-            gh release create "$GITHUB_REF_NAME" \
-              WalkingPad-Client.zip \
-              --title "WalkingPad Client ${{ steps.version.outputs.version }}" \
-              --generate-notes
-          fi
-
       - name: Update appcast and version on main
         env:
           GH_TOKEN: ${{ github.token }}
@@ -130,3 +115,28 @@ jobs:
           git add appcast.xml walkingpad-client.xcodeproj/project.pbxproj
           git commit -m "chore: update version and appcast for v${{ steps.version.outputs.version }}"
           git push origin main
+          # Move the tag to this commit so it points to the versioned source
+          git tag -f "$GITHUB_REF_NAME"
+          git push origin "$GITHUB_REF_NAME" --force
+
+      - name: Create or update GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          # Find previous tag for release notes
+          PREV_TAG=$(git tag --sort=-v:refname | grep '^v' | sed -n '2p')
+          NOTES_FLAG="--generate-notes"
+          if [ -n "$PREV_TAG" ]; then
+            NOTES_FLAG="--generate-notes --notes-start-tag $PREV_TAG"
+          fi
+
+          if gh release view "$GITHUB_REF_NAME" &>/dev/null; then
+            # Release already exists (created manually) — upload the asset
+            gh release upload "$GITHUB_REF_NAME" WalkingPad-Client.zip --clobber
+          else
+            # Create new release with notes from previous tag
+            gh release create "$GITHUB_REF_NAME" \
+              WalkingPad-Client.zip \
+              --title "WalkingPad Client ${{ steps.version.outputs.version }}" \
+              $NOTES_FLAG
+          fi
