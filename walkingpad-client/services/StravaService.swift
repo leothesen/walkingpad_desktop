@@ -11,6 +11,10 @@ class StravaService: ObservableObject {
     @Published var lastError: String? = nil
     @Published var yesterdayNeedsSync: Bool = false
     @Published var lastStravaSync: Date? = nil
+    @Published var unsyncedSessionCount: Int = 0
+    @Published var unsyncedDateLabel: String? = nil
+    @Published var uploadResultMessage: String? = nil
+    @Published var uploadResultIsError: Bool = false
 
     private var clientId: String?
     private var clientSecret: String?
@@ -218,7 +222,6 @@ class StravaService: ObservableObject {
             "start_date_local": iso8601.string(from: firstStart),
             "elapsed_time": totalSeconds,
             "distance": totalDistance,
-            "steps": totalSteps,
             "description": "Walking treadmill: \(sessions.count) walking session(s) · \(totalSteps) steps · avg \(String(format: "%.1f", avgSpeed)) km/h"
         ]
 
@@ -249,6 +252,10 @@ class StravaService: ObservableObject {
                     isSyncing = false
                     isSyncedToday = true
                     lastStravaSync = Date()
+                    unsyncedSessionCount = 0
+                    unsyncedDateLabel = nil
+                    uploadResultMessage = "Uploaded \(String(format: "%.1f", distKm))km to Strava"
+                    uploadResultIsError = false
                 }
                 return true
             } else if [401, 403].contains(statusCode) {
@@ -257,6 +264,8 @@ class StravaService: ObservableObject {
                     isSyncing = false
                     lastError = "Auth error — reconnect Strava"
                     isConnected = false
+                    uploadResultMessage = "Strava auth error — reconnect needed"
+                    uploadResultIsError = true
                     disconnect()
                 }
                 return false
@@ -265,6 +274,8 @@ class StravaService: ObservableObject {
                 await MainActor.run {
                     isSyncing = false
                     lastError = "Post failed (\(statusCode))"
+                    uploadResultMessage = "Upload failed (\(statusCode))"
+                    uploadResultIsError = true
                 }
                 return false
             }
@@ -273,6 +284,8 @@ class StravaService: ObservableObject {
             await MainActor.run {
                 isSyncing = false
                 lastError = "Network error"
+                uploadResultMessage = "Network error"
+                uploadResultIsError = true
             }
             return false
         }
@@ -287,17 +300,48 @@ class StravaService: ObservableObject {
         let lastSync = await notionService.fetchLastStravaSync()
         await MainActor.run { lastStravaSync = lastSync }
 
+        // Check yesterday
         let yesterday = Calendar.current.date(byAdding: .day, value: -1, to: Date())!
         let posted = await notionService.isStravaPosted(for: yesterday)
         if posted {
-            await MainActor.run { yesterdayNeedsSync = false }
+            await MainActor.run {
+                yesterdayNeedsSync = false
+                unsyncedSessionCount = 0
+                unsyncedDateLabel = nil
+            }
             return
         }
         let sessions = await notionService.fetchSessions(for: yesterday)
         let hasSessions = sessions != nil && !sessions!.isEmpty
-        await MainActor.run { yesterdayNeedsSync = hasSessions }
+        await MainActor.run {
+            yesterdayNeedsSync = hasSessions
+            if hasSessions {
+                unsyncedSessionCount = sessions!.count
+                unsyncedDateLabel = "yesterday"
+            } else {
+                unsyncedSessionCount = 0
+                unsyncedDateLabel = nil
+            }
+        }
         if hasSessions {
             print("Strava: yesterday has \(sessions!.count) unsynced sessions")
+        }
+
+        // Also check today if not synced
+        if !isSyncedToday {
+            let todayPosted = await notionService.isStravaPosted(for: Date())
+            if todayPosted {
+                await MainActor.run { isSyncedToday = true }
+            } else {
+                let todaySessions = await notionService.fetchSessions(for: Date())
+                let todayCount = todaySessions?.count ?? 0
+                if todayCount > 0 && !hasSessions {
+                    await MainActor.run {
+                        unsyncedSessionCount = todayCount
+                        unsyncedDateLabel = "today"
+                    }
+                }
+            }
         }
     }
 
@@ -375,6 +419,10 @@ class StravaService: ObservableObject {
                     isSyncing = false
                     yesterdayNeedsSync = false
                     lastStravaSync = Date()
+                    unsyncedSessionCount = 0
+                    unsyncedDateLabel = nil
+                    uploadResultMessage = "Uploaded yesterday's \(String(format: "%.1f", distKm))km to Strava"
+                    uploadResultIsError = false
                 }
                 return true
             } else if [401, 403].contains(statusCode) {
@@ -383,6 +431,8 @@ class StravaService: ObservableObject {
                     isSyncing = false
                     lastError = "Auth error — reconnect Strava"
                     isConnected = false
+                    uploadResultMessage = "Strava auth error — reconnect needed"
+                    uploadResultIsError = true
                     disconnect()
                 }
                 return false
@@ -391,6 +441,8 @@ class StravaService: ObservableObject {
                 await MainActor.run {
                     isSyncing = false
                     lastError = "Post failed (\(statusCode))"
+                    uploadResultMessage = "Upload failed (\(statusCode))"
+                    uploadResultIsError = true
                 }
                 return false
             }
@@ -399,9 +451,16 @@ class StravaService: ObservableObject {
             await MainActor.run {
                 isSyncing = false
                 lastError = "Network error"
+                uploadResultMessage = "Network error"
+                uploadResultIsError = true
             }
             return false
         }
+    }
+
+    /// Clears the upload result message.
+    func clearUploadResult() {
+        uploadResultMessage = nil
     }
 
     // MARK: - Token Request Helper
