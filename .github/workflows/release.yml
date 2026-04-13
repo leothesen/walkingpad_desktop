@@ -60,7 +60,14 @@ jobs:
           # Download Sparkle tools
           SPARKLE_VERSION="2.6.4"
           curl -sL "https://github.com/sparkle-project/Sparkle/releases/download/${SPARKLE_VERSION}/Sparkle-${SPARKLE_VERSION}.tar.xz" \
-            | tar xJ -C /tmp
+            -o /tmp/sparkle.tar.xz
+          mkdir -p /tmp/sparkle
+          tar xJf /tmp/sparkle.tar.xz -C /tmp/sparkle
+
+          # Find sign_update binary
+          SIGN_UPDATE=$(find /tmp/sparkle -name "sign_update" -type f | head -1)
+          echo "Found sign_update at: $SIGN_UPDATE"
+          ls -la "$SIGN_UPDATE"
 
           # Get zip file size and build date
           FILE_SIZE=$(stat -f%z WalkingPad-Client.zip)
@@ -69,34 +76,46 @@ jobs:
 
           # Write private key to a temp file for sign_update
           KEY_FILE=$(mktemp)
-          echo "$SPARKLE_PRIVATE_KEY" > "$KEY_FILE"
+          echo -n "$SPARKLE_PRIVATE_KEY" > "$KEY_FILE"
 
           # Generate EdDSA signature
-          SIGNATURE=$(/tmp/bin/sign_update WalkingPad-Client.zip -f "$KEY_FILE")
+          chmod +x "$SIGN_UPDATE"
+          SIGNATURE=$("$SIGN_UPDATE" WalkingPad-Client.zip -f "$KEY_FILE" 2>&1) || {
+            echo "sign_update failed: $SIGNATURE"
+            rm -f "$KEY_FILE"
+            exit 1
+          }
+          echo "Signature: $SIGNATURE"
           rm -f "$KEY_FILE"
 
           # Generate appcast.xml
-          cat > appcast.xml <<EOF
+          cat > appcast.xml << 'APPCAST_TEMPLATE'
           <?xml version="1.0" encoding="utf-8"?>
           <rss version="2.0" xmlns:sparkle="http://www.andymatuschak.org/xml-namespaces/sparkle" xmlns:dc="http://purl.org/dc/elements/1.1/">
             <channel>
               <title>WalkingPad Client</title>
               <link>https://github.com/leothesen/walkingpad_desktop</link>
               <item>
-                <title>Version ${VERSION}</title>
-                <pubDate>${PUB_DATE}</pubDate>
-                <sparkle:version>${VERSION}</sparkle:version>
-                <sparkle:shortVersionString>${VERSION}</sparkle:shortVersionString>
+                <title>Version __VERSION__</title>
+                <pubDate>__PUB_DATE__</pubDate>
+                <sparkle:version>__VERSION__</sparkle:version>
+                <sparkle:shortVersionString>__VERSION__</sparkle:shortVersionString>
                 <enclosure
-                  url="https://github.com/leothesen/walkingpad_desktop/releases/download/v${VERSION}/WalkingPad-Client.zip"
-                  length="${FILE_SIZE}"
+                  url="https://github.com/leothesen/walkingpad_desktop/releases/download/v__VERSION__/WalkingPad-Client.zip"
+                  length="__FILE_SIZE__"
                   type="application/octet-stream"
-                  sparkle:edSignature="${SIGNATURE}"
+                  sparkle:edSignature="__SIGNATURE__"
                 />
               </item>
             </channel>
           </rss>
-          EOF
+          APPCAST_TEMPLATE
+          sed -i '' "s|__VERSION__|${VERSION}|g" appcast.xml
+          sed -i '' "s|__PUB_DATE__|${PUB_DATE}|g" appcast.xml
+          sed -i '' "s|__FILE_SIZE__|${FILE_SIZE}|g" appcast.xml
+          sed -i '' "s|__SIGNATURE__|${SIGNATURE}|g" appcast.xml
+          echo "Generated appcast.xml:"
+          cat appcast.xml
 
       - name: Create or update GitHub Release
         env:
