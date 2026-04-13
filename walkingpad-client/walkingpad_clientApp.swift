@@ -31,12 +31,12 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     var notionService: NotionService { NotionService.shared }
     var stravaService: StravaService { StravaService.shared }
 
-    private let updaterController = SPUStandardUpdaterController(startingUpdater: false, updaterDelegate: nil, userDriverDelegate: nil)
+    static let updaterController = SPUStandardUpdaterController(startingUpdater: false, updaterDelegate: nil, userDriverDelegate: nil)
 
     var popover: NSPopover!
     var statusBarItem: NSStatusItem!
 
-    func checkForUpdates() {
+    static func checkForUpdates() {
         updaterController.checkForUpdates(nil)
     }
 
@@ -137,7 +137,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     /// Sets up the status bar menu item, starts the HTTP API server, and fetches today's stats.
     func applicationDidFinishLaunching(_ aNotification: Notification) {
         // Start Sparkle auto-updater
-        updaterController.startUpdater()
+        AppDelegate.updaterController.startUpdater()
 
         // Request notification permissions
         UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound]) { granted, _ in

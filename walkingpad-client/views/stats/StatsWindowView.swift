@@ -38,7 +38,7 @@ struct StatsWindowView: View {
                         .foregroundStyle(.tertiary)
 
                     Button(action: {
-                        (NSApp.delegate as? AppDelegate)?.checkForUpdates()
+                        AppDelegate.checkForUpdates()
                     }) {
                         Image(systemName: "arrow.down.circle")
                             .font(.body)
