@@ -78,42 +78,21 @@ jobs:
           KEY_FILE=$(mktemp)
           echo -n "$SPARKLE_PRIVATE_KEY" > "$KEY_FILE"
 
-          # Generate EdDSA signature
+          # Generate EdDSA signature — sign_update outputs: sparkle:edSignature="<sig>" length="<len>"
+          # Extract just the signature value
           chmod +x "$SIGN_UPDATE"
-          SIGNATURE=$("$SIGN_UPDATE" WalkingPad-Client.zip -f "$KEY_FILE" 2>&1) || {
-            echo "sign_update failed: $SIGNATURE"
+          RAW_OUTPUT=$("$SIGN_UPDATE" WalkingPad-Client.zip -f "$KEY_FILE" 2>&1) || {
+            echo "sign_update failed: $RAW_OUTPUT"
             rm -f "$KEY_FILE"
             exit 1
           }
-          echo "Signature: $SIGNATURE"
           rm -f "$KEY_FILE"
+          SIGNATURE=$(echo "$RAW_OUTPUT" | sed -n 's/.*edSignature="\([^"]*\)".*/\1/p')
+          echo "Signature: $SIGNATURE"
 
           # Generate appcast.xml
-          cat > appcast.xml << 'APPCAST_TEMPLATE'
-          <?xml version="1.0" encoding="utf-8"?>
-          <rss version="2.0" xmlns:sparkle="http://www.andymatuschak.org/xml-namespaces/sparkle" xmlns:dc="http://purl.org/dc/elements/1.1/">
-            <channel>
-              <title>WalkingPad Client</title>
-              <link>https://github.com/leothesen/walkingpad_desktop</link>
-              <item>
-                <title>Version __VERSION__</title>
-                <pubDate>__PUB_DATE__</pubDate>
-                <sparkle:version>__VERSION__</sparkle:version>
-                <sparkle:shortVersionString>__VERSION__</sparkle:shortVersionString>
-                <enclosure
-                  url="https://github.com/leothesen/walkingpad_desktop/releases/download/v__VERSION__/WalkingPad-Client.zip"
-                  length="__FILE_SIZE__"
-                  type="application/octet-stream"
-                  sparkle:edSignature="__SIGNATURE__"
-                />
-              </item>
-            </channel>
-          </rss>
-          APPCAST_TEMPLATE
-          sed -i '' "s|__VERSION__|${VERSION}|g" appcast.xml
-          sed -i '' "s|__PUB_DATE__|${PUB_DATE}|g" appcast.xml
-          sed -i '' "s|__FILE_SIZE__|${FILE_SIZE}|g" appcast.xml
-          sed -i '' "s|__SIGNATURE__|${SIGNATURE}|g" appcast.xml
+          printf '<?xml version="1.0" encoding="utf-8"?>\n<rss version="2.0" xmlns:sparkle="http://www.andymatuschak.org/xml-namespaces/sparkle" xmlns:dc="http://purl.org/dc/elements/1.1/">\n  <channel>\n    <title>WalkingPad Client</title>\n    <link>https://github.com/leothesen/walkingpad_desktop</link>\n    <item>\n      <title>Version %s</title>\n      <pubDate>%s</pubDate>\n      <sparkle:version>%s</sparkle:version>\n      <sparkle:shortVersionString>%s</sparkle:shortVersionString>\n      <enclosure\n        url="https://github.com/leothesen/walkingpad_desktop/releases/download/v%s/WalkingPad-Client.zip"\n        length="%s"\n        type="application/octet-stream"\n        sparkle:edSignature="%s"\n      />\n    </item>\n  </channel>\n</rss>\n' \
+            "$VERSION" "$PUB_DATE" "$VERSION" "$VERSION" "$VERSION" "$FILE_SIZE" "$SIGNATURE" > appcast.xml
           echo "Generated appcast.xml:"
           cat appcast.xml
 
@@ -138,12 +117,16 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
+          # Save the generated appcast before resetting
+          cp appcast.xml /tmp/appcast.xml
+          # Reset build-time changes and switch to main
+          git checkout -- .
           git fetch origin main
           git checkout main
-          # Update version in project file
+          # Apply version bump and appcast
           sed -i '' "s/MARKETING_VERSION = .*;/MARKETING_VERSION = ${{ steps.version.outputs.version }};/g" \
             walkingpad-client.xcodeproj/project.pbxproj
-          cp appcast.xml appcast.xml
+          cp /tmp/appcast.xml appcast.xml
           git add appcast.xml walkingpad-client.xcodeproj/project.pbxproj
           git commit -m "chore: update version and appcast for v${{ steps.version.outputs.version }}"
           git push origin main
