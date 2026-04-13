@@ -216,14 +216,19 @@ class NotionService: ObservableObject {
 
     /// Fetches only today's sessions from Notion (filtered by date).
     func fetchTodaySessions() async -> [SessionSaveData]? {
+        return await fetchSessions(for: Date())
+    }
+
+    /// Fetches sessions for a specific date from Notion.
+    func fetchSessions(for date: Date) async -> [SessionSaveData]? {
         guard let apiKey = apiKey, let databaseId = databaseId else { return nil }
 
-        let todayStr = Self.dateFormatter.string(from: Date())
+        let dateStr = Self.dateFormatter.string(from: date)
         let body: [String: Any] = [
             "page_size": 100,
             "filter": [
                 "property": "Date",
-                "date": ["equals": todayStr]
+                "date": ["equals": dateStr]
             ]
         ]
 
@@ -246,10 +251,10 @@ class NotionService: ObservableObject {
             let sessions = results.filter {
                 !($0["archived"] as? Bool ?? false) && !($0["in_trash"] as? Bool ?? false)
             }.compactMap { parseSession(from: $0) }
-            print("Notion: fetched \(sessions.count) sessions for today (\(todayStr))")
+            print("Notion: fetched \(sessions.count) sessions for \(dateStr)")
             return sessions
         } catch {
-            print("Notion: fetchTodaySessions error: \(error)")
+            print("Notion: fetchSessions error: \(error)")
             return nil
         }
     }
@@ -446,6 +451,47 @@ class NotionService: ObservableObject {
     func isStravaPosted(for date: Date) async -> Bool {
         guard let result = await fetchDayTotal(for: date) else { return false }
         return result.stravaPosted
+    }
+
+    /// Fetches the most recent Strava sync date by checking recent Day Totals entries.
+    func fetchLastStravaSync() async -> Date? {
+        guard let apiKey = apiKey else { return nil }
+
+        let body: [String: Any] = [
+            "page_size": 10,
+            "sorts": [["property": "Date", "direction": "descending"]]
+        ]
+
+        do {
+            var request = URLRequest(url: URL(string: "\(baseURL)/databases/\(dayTotalsDatabaseId)/query")!)
+            request.httpMethod = "POST"
+            request.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
+            request.setValue(notionVersion, forHTTPHeaderField: "Notion-Version")
+            request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+            request.httpBody = try JSONSerialization.data(withJSONObject: body)
+
+            let (data, response) = try await session.data(for: request)
+            guard (response as? HTTPURLResponse)?.statusCode == 200,
+                  let json = try JSONSerialization.jsonObject(with: data) as? [String: Any],
+                  let results = json["results"] as? [[String: Any]] else { return nil }
+
+            for page in results {
+                let props = page["properties"] as? [String: Any] ?? [:]
+                let postedAt = extractRichText(props["Strava Posted At"])
+                guard !postedAt.isEmpty else { continue }
+
+                guard let dateProp = props["Date"] as? [String: Any],
+                      let dateObj = dateProp["date"] as? [String: Any],
+                      let dateStr = dateObj["start"] as? String,
+                      let date = Self.dateFormatter.date(from: dateStr) else { continue }
+
+                return combineDateTime(date: date, timeStr: postedAt) ?? date
+            }
+            return nil
+        } catch {
+            print("Notion: fetchLastStravaSync error: \(error)")
+            return nil
+        }
     }
 }
 
