@@ -10,19 +10,29 @@ struct StatsWindowView: View {
     var stravaService: StravaService
     @State private var showDebug = false
     @State private var hoverFraction: CGFloat = 0.5
+    @State private var selectedRange: TimeRange = .week
 
     var body: some View {
         VStack(spacing: 14) {
                 // Time range selector + debug toggle
                 HStack {
-                    Picker("Range", selection: $viewModel.selectedRange.animation(.spring(duration: 0.35))) {
+                    Picker(selection: $selectedRange) {
                         ForEach(TimeRange.allCases, id: \.self) { range in
                             Text(range.rawValue).tag(range)
                         }
+                    } label: {
+                        SwiftUI.EmptyView()
                     }
                     .pickerStyle(.segmented)
+                    .labelsHidden()
+                    .onChange(of: selectedRange) {
+                        DispatchQueue.main.async {
+                            viewModel.selectedRange = selectedRange
+                            viewModel.hoveredPoint = nil
+                        }
+                    }
 
-                    Button(action: { withAnimation(.spring(duration: 0.25)) { showDebug.toggle() } }) {
+                    Button(action: { showDebug.toggle() }) {
                         Image(systemName: showDebug ? "ladybug.fill" : "ladybug")
                             .font(.body)
                             .foregroundStyle(showDebug ? .blue : .secondary)
@@ -68,7 +78,6 @@ struct StatsWindowView: View {
                         stravaService: stravaService
                     )
                     .frame(minHeight: 200)
-                    .transition(.move(edge: .bottom).combined(with: .opacity))
                 }
             }
             .padding(16)
