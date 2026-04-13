@@ -9,6 +9,7 @@ struct RunningView: View {
     @State private var sliderSpeed: Double = 0
     @State private var isDragging: Bool = false
     @State private var showFinishConfirm: Bool = false
+    @State private var stoppingStartTime: Date?
 
     var body: some View {
         let state = walkingPadService.lastStatus()
@@ -33,7 +34,7 @@ struct RunningView: View {
                             .contentShape(Circle())
                     }
                     .buttonStyle(.plain)
-                    .glassEffect(.regular.interactive(), in: .circle)
+                    .background(.ultraThinMaterial, in: .circle)
 
                     Slider(value: $sliderSpeed, in: 0.5...8.0, step: 0.5) {
                         SwiftUI.EmptyView()
@@ -51,13 +52,13 @@ struct RunningView: View {
                             .contentShape(Circle())
                     }
                     .buttonStyle(.plain)
-                    .glassEffect(.regular.interactive(), in: .circle)
+                    .background(.ultraThinMaterial, in: .circle)
                 }
                 .padding(.top, 2)
             }
             .padding(.horizontal, 10)
             .padding(.vertical, 6)
-            .glassEffect(.regular, in: .rect(cornerRadius: 10))
+            .background(.ultraThinMaterial, in: .rect(cornerRadius: 10))
 
             // Mode + Stop row
             HStack(spacing: 6) {
@@ -67,60 +68,133 @@ struct RunningView: View {
                 }
             }
 
-            Button(action: {
-                walkingPadService.command()?.setSpeed(speed: 0)
-            }) {
-                Text("Stop")
-                    .font(.caption.weight(.semibold))
-                    .foregroundStyle(.red)
-                    .frame(maxWidth: .infinity)
-                    .contentShape(Capsule())
-            }
-            .buttonStyle(.plain)
-            .padding(.vertical, 4)
-            .glassEffect(.regular.tint(.red.opacity(0.1)).interactive(), in: .capsule)
-
-            if showFinishConfirm {
-                HStack(spacing: 6) {
-                    Text("Post to Strava?")
-                        .font(.caption2)
-                        .foregroundStyle(.secondary)
-                    Spacer()
-                    Button(action: { showFinishConfirm = false }) {
-                        Text("No")
+            if workout.isStopping || workout.idleProgress > 0 || workout.sessionSaveState != .none {
+                // Stopping / idle detection / saving — replaces Stop buttons
+                if workout.sessionSaveState == .saving {
+                    HStack(spacing: 6) {
+                        ProgressView()
+                            .controlSize(.mini)
+                        Text("Saving session…")
                             .font(.caption2.weight(.medium))
-                            .frame(width: 40)
-                            .contentShape(Capsule())
+                            .foregroundStyle(.secondary)
                     }
-                    .buttonStyle(.plain)
-                    .padding(.vertical, 3)
-                    .glassEffect(.regular.interactive(), in: .capsule)
-
-                    Button(action: {
-                        showFinishConfirm = false
-                        stopAndFinishDay()
-                    }) {
-                        Text("Yes")
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 4)
+                    .background(.ultraThinMaterial, in: .capsule)
+                } else if workout.sessionSaveState == .uploading {
+                    HStack(spacing: 6) {
+                        ProgressView()
+                            .controlSize(.mini)
+                        Text("Uploading to Strava…")
                             .font(.caption2.weight(.medium))
                             .foregroundStyle(.orange)
-                            .frame(width: 40)
-                            .contentShape(Capsule())
                     }
-                    .buttonStyle(.plain)
-                    .padding(.vertical, 3)
-                    .glassEffect(.regular.tint(.orange.opacity(0.1)).interactive(), in: .capsule)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 4)
+                    .background(.orange.opacity(0.1), in: .capsule)
+                } else if workout.sessionSaveState == .complete {
+                    HStack(spacing: 4) {
+                        Image(systemName: "checkmark.circle.fill")
+                            .font(.caption2)
+                            .foregroundStyle(.green)
+                        Text("Complete")
+                            .font(.caption2.weight(.medium))
+                            .foregroundStyle(.green)
+                    }
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 4)
+                    .background(.green.opacity(0.1), in: .capsule)
+                } else {
+                    TimelineView(.periodic(from: .now, by: 0.25)) { timeline in
+                        let elapsed = stoppingStartTime.map { timeline.date.timeIntervalSince($0) } ?? 0
+                        let idle = workout.idleProgress
+                        let progress: Double = {
+                            if idle >= 1 {
+                                // After first idle: fast fill from 1.0→2.0 over ~4s
+                                let sinceFirstIdle = max(elapsed - 10.0, 0)
+                                return 1.0 + min(sinceFirstIdle / 4.1, 1.0)
+                            } else {
+                                // Before first idle: slow fill 0→1.0 over 10s, then wait at 1.0
+                                return min(elapsed / 10.0, 1.0)
+                            }
+                        }()
+
+                        VStack(spacing: 4) {
+                            Text("Stopping")
+                                .font(.caption2.weight(.medium))
+                                .foregroundStyle(.red)
+                            ProgressView(value: min(progress, 2.0), total: 2)
+                                .tint(.red)
+                        }
+                    }
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 4)
+                    .padding(.horizontal, 8)
+                    .background(.red.opacity(0.1), in: .capsule)
+                    .onAppear {
+                        if stoppingStartTime == nil {
+                            stoppingStartTime = Date()
+                        }
+                    }
                 }
             } else {
-                Button(action: { showFinishConfirm = true }) {
-                    Text("Stop & Finish Day")
-                        .font(.caption2.weight(.medium))
-                        .foregroundStyle(.orange)
+                Button(action: {
+                    stoppingStartTime = Date()
+                    workout.isStopping = true
+                    walkingPadService.command()?.setSpeed(speed: 0)
+                }) {
+                    Text("Stop")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(.red)
                         .frame(maxWidth: .infinity)
                         .contentShape(Capsule())
                 }
                 .buttonStyle(.plain)
-                .padding(.vertical, 3)
-                .glassEffect(.regular.tint(.orange.opacity(0.1)).interactive(), in: .capsule)
+                .padding(.vertical, 4)
+                .background(.red.opacity(0.1), in: .capsule)
+
+                if showFinishConfirm {
+                    HStack(spacing: 6) {
+                        Text("Post to Strava?")
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
+                        Spacer()
+                        Button(action: { showFinishConfirm = false }) {
+                            Text("No")
+                                .font(.caption2.weight(.medium))
+                                .frame(width: 40)
+                                .contentShape(Capsule())
+                        }
+                        .buttonStyle(.plain)
+                        .padding(.vertical, 3)
+                        .background(.ultraThinMaterial, in: .capsule)
+
+                        Button(action: {
+                            showFinishConfirm = false
+                            stopAndFinishDay()
+                        }) {
+                            Text("Yes")
+                                .font(.caption2.weight(.medium))
+                                .foregroundStyle(.orange)
+                                .frame(width: 40)
+                                .contentShape(Capsule())
+                        }
+                        .buttonStyle(.plain)
+                        .padding(.vertical, 3)
+                        .background(.orange.opacity(0.1), in: .capsule)
+                    }
+                } else {
+                    Button(action: { showFinishConfirm = true }) {
+                        Text("Stop & Finish Day")
+                            .font(.caption2.weight(.medium))
+                            .foregroundStyle(.orange)
+                            .frame(maxWidth: .infinity)
+                            .contentShape(Capsule())
+                    }
+                    .buttonStyle(.plain)
+                    .padding(.vertical, 3)
+                    .background(.orange.opacity(0.1), in: .capsule)
+                }
             }
         }
         .onAppear { sliderSpeed = max(currentSpeed, 0.5) }
@@ -134,6 +208,8 @@ struct RunningView: View {
     }
 
     private func stopAndFinishDay() {
+        stoppingStartTime = Date()
+        workout.isStopping = true
         walkingPadService.command()?.setSpeed(speed: 0)
 
         let notion = NotionService.shared
@@ -151,6 +227,9 @@ struct RunningView: View {
                 try? await Task.sleep(for: .seconds(1))
             }
 
+            // Session saved — now upload to Strava
+            await MainActor.run { workout.sessionSaveState = .uploading }
+
             // Use in-memory sessions as primary source — always has the just-completed session
             let localSessions = await MainActor.run { workout.todaySessions }
 
@@ -165,6 +244,16 @@ struct RunningView: View {
                 ActivityLog.shared.info("Stop & Finish Day: \(success ? "completed" : "failed")")
             } else {
                 ActivityLog.shared.error("No sessions found for today")
+            }
+
+            await MainActor.run {
+                workout.sessionSaveState = .complete
+            }
+            try? await Task.sleep(for: .seconds(5))
+            await MainActor.run {
+                if workout.sessionSaveState == .complete {
+                    workout.sessionSaveState = .none
+                }
             }
         }
     }
@@ -200,9 +289,6 @@ struct RunningView: View {
         }
         .buttonStyle(.plain)
         .padding(.vertical, 4)
-        .glassEffect(
-            mode == current ? .regular.tint(.accentColor).interactive() : .regular.interactive(),
-            in: .capsule
-        )
+        .background(mode == current ? AnyShapeStyle(.tint) : AnyShapeStyle(.ultraThinMaterial), in: .capsule)
     }
 }

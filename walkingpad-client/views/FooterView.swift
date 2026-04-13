@@ -29,7 +29,7 @@ struct FooterView: View {
                     .buttonStyle(.plain)
                     .padding(.horizontal, 8)
                     .padding(.vertical, 3)
-                    .glassEffect(.regular.interactive(), in: .capsule)
+                    .background(.ultraThinMaterial, in: .capsule)
 
                     Button(action: {
                         showUploadConfirm = false
@@ -43,7 +43,7 @@ struct FooterView: View {
                     .buttonStyle(.plain)
                     .padding(.horizontal, 8)
                     .padding(.vertical, 3)
-                    .glassEffect(.regular.tint(.orange.opacity(0.1)).interactive(), in: .capsule)
+                    .background(.orange.opacity(0.1), in: .capsule)
                 }
             }
 
@@ -56,7 +56,7 @@ struct FooterView: View {
                 .buttonStyle(.plain)
                 .padding(.horizontal, 8)
                 .padding(.vertical, 3)
-                .glassEffect(.regular.interactive(), in: .capsule)
+                .background(.ultraThinMaterial, in: .capsule)
 
                 stravaButton
 
@@ -75,7 +75,7 @@ struct FooterView: View {
                 .buttonStyle(.plain)
                 .padding(.horizontal, 8)
                 .padding(.vertical, 3)
-                .glassEffect(.regular.interactive(), in: .capsule)
+                .background(.ultraThinMaterial, in: .capsule)
             }
         }
     }
@@ -97,7 +97,7 @@ struct FooterView: View {
             .buttonStyle(.plain)
             .padding(.horizontal, 6)
             .padding(.vertical, 3)
-            .glassEffect(.regular.interactive(), in: .capsule)
+            .background(.ultraThinMaterial, in: .capsule)
             .help("Connect to Strava")
         } else if strava.isSyncedToday {
             Image(systemName: "checkmark.circle.fill")
@@ -114,7 +114,7 @@ struct FooterView: View {
             .buttonStyle(.plain)
             .padding(.horizontal, 6)
             .padding(.vertical, 3)
-            .glassEffect(.regular.interactive(), in: .capsule)
+            .background(.ultraThinMaterial, in: .capsule)
             .help(strava.lastError ?? "Error")
         } else {
             Button(action: { showUploadConfirm = true; strava.clearUploadResult() }) {
@@ -126,7 +126,7 @@ struct FooterView: View {
             .buttonStyle(.plain)
             .padding(.horizontal, 6)
             .padding(.vertical, 3)
-            .glassEffect(.regular.interactive(), in: .capsule)
+            .background(.ultraThinMaterial, in: .capsule)
             .help("Post today's walk to Strava")
         }
     }
@@ -191,9 +191,9 @@ struct FooterView: View {
             Task {
                 if let sessions = await notion.fetchAllSessions() {
                     let workouts = NotionService.groupSessionsByDate(sessions)
-                    print("Stats: replacing with \(workouts.count) days from Notion (\(sessions.count) sessions)")
+                    appLog("Stats: replacing with \(workouts.count) days from Notion (\(sessions.count) sessions)")
                     for w in workouts {
-                        print("  Day: \(w.date), steps=\(w.steps), dist=\(w.distance), sessions=\(w.sessions?.count ?? 0)")
+                        appLog("  Day: \(w.date), steps=\(w.steps), dist=\(w.distance), sessions=\(w.sessions?.count ?? 0)")
                     }
                     await MainActor.run {
                         viewModel.replaceWorkouts(workouts, source: "Notion")

@@ -54,7 +54,21 @@ class Workout: ObservableObject {
     /// Count of consecutive zero-step updates while a session is active.
     /// Used to detect belt stop even when the treadmill keeps reporting non-zero speed.
     private var consecutiveZeroStepUpdates: Int = 0
-    private let zeroStepThreshold: Int = 3  // ~12 seconds at 4s polling
+    private let zeroStepThreshold: Int = 2  // ~8 seconds at 4s polling
+
+    /// Idle detection progress shown in the UI (0 when not idle, 1...threshold during detection).
+    @Published public var idleProgress: Int = 0
+    /// Set when user explicitly taps Stop — triggers immediate idle UI.
+    @Published public var isStopping: Bool = false
+    /// Session save state shown in the UI.
+    @Published public var sessionSaveState: SessionSaveState = .none
+
+    enum SessionSaveState: Equatable {
+        case none
+        case saving
+        case uploading
+        case complete
+    }
 
     /// Tracks whether we've already sent the 60-min notification for the current session.
     private var hasNotifiedForCurrentSession: Bool = false
@@ -89,7 +103,7 @@ class Workout: ObservableObject {
             trigger: nil
         )
         UNUserNotificationCenter.current().add(request)
-        print("60-min walking notification sent, reducing speed to 1.5 km/h")
+        appLog("60-min walking notification sent, reducing speed to 1.5 km/h")
 
         // Nudge: slow the treadmill to 1.5 km/h to encourage stopping
         onSpeedNudge?(15)
@@ -137,25 +151,30 @@ class Workout: ObservableObject {
             save()
         }
 
-        print("adding steps=\(stepDiff) distance=\(distanceDiff)")
+        appLog("adding steps=\(stepDiff) distance=\(distanceDiff)")
 
         // Session tracking (non-published state, safe to update synchronously)
         let wasWalking = oldState.speed > 0
         let isWalking = newState.speed > 0
 
         if isWalking && !wasWalking && self.currentSessionStart == nil {
-            print("SESSION START: speed \(oldState.speed) → \(newState.speed)")
+            appLog("SESSION START: speed \(oldState.speed) → \(newState.speed)")
             self.currentSessionStart = newState.time
             self.currentSessionSteps = 0
             self.currentSessionDistance = 0
             self.consecutiveZeroStepUpdates = 0
             self.hasNotifiedForCurrentSession = false
+            DispatchQueue.main.async {
+                self.idleProgress = 0
+                self.isStopping = false
+                self.sessionSaveState = .none
+            }
         }
 
         // Also start a session if we're getting steps but no session is active
         // (happens when treadmill was already moving on first valid state pair)
         if isWalking && stepDiff > 0 && self.currentSessionStart == nil {
-            print("SESSION START (mid-walk): speed=\(newState.speed), steps already flowing")
+            appLog("SESSION START (mid-walk): speed=\(newState.speed), steps already flowing")
             self.currentSessionStart = newState.time
             self.currentSessionSteps = 0
             self.currentSessionDistance = 0
@@ -170,12 +189,18 @@ class Workout: ObservableObject {
             // Check if we need to send the 60-minute notification
             sendWalkingDurationNotificationIfNeeded()
 
-            // Track consecutive zero-step updates to detect belt stop
-            if stepDiff == 0 {
+            // Track consecutive zero-step updates to detect belt stop.
+            // Only start counting after we've seen at least one step in this session
+            // to avoid false idle on session start.
+            if stepDiff == 0 && self.currentSessionSteps > 0 {
                 self.consecutiveZeroStepUpdates += 1
-                print("SESSION IDLE: \(self.consecutiveZeroStepUpdates)/\(self.zeroStepThreshold) zero-step updates, speed=\(newState.speed)")
+                appLog("SESSION IDLE: \(self.consecutiveZeroStepUpdates)/\(self.zeroStepThreshold) zero-step updates, speed=\(newState.speed)")
             } else {
                 self.consecutiveZeroStepUpdates = 0
+            }
+            // Update idle progress for UI
+            DispatchQueue.main.async {
+                self.idleProgress = self.consecutiveZeroStepUpdates
             }
         }
 
@@ -185,7 +210,7 @@ class Workout: ObservableObject {
         var completedSession: SessionSaveData? = nil
 
         if (wasWalking && !isWalking || beltStopped), let sessionStart = self.currentSessionStart {
-            print("SESSION END: speed \(oldState.speed) → \(newState.speed), steps=\(self.currentSessionSteps), dist=\(self.currentSessionDistance), reason=\(beltStopped ? "idle" : "speed→0")")
+            appLog("SESSION END: speed \(oldState.speed) → \(newState.speed), steps=\(self.currentSessionSteps), dist=\(self.currentSessionDistance), reason=\(beltStopped ? "idle" : "speed→0")")
             completedSession = SessionSaveData(
                 startTime: sessionStart,
                 endTime: newState.time,
@@ -211,12 +236,27 @@ class Workout: ObservableObject {
             self.sessionDistance = self.currentSessionDistance
 
             if let session = completedSession {
-                print("SESSION COMPLETE: appending session #\(self.todaySessions.count + 1), steps=\(session.steps), dist=\(session.distance)")
+                self.idleProgress = 0
+                self.isStopping = false
+                self.sessionSaveState = .saving
+                appLog("SESSION COMPLETE: appending session #\(self.todaySessions.count + 1), steps=\(session.steps), dist=\(session.distance)")
                 self.todaySessions.append(session)
                 self.sessionSteps = 0
                 self.sessionDistance = 0
                 self.save()
                 self.onSessionComplete?(session, self.todaySessions.count)
+                // Show "complete" after a short delay, then clear — unless
+                // stopAndFinishDay takes over and drives its own states
+                DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
+                    if self.sessionSaveState == .saving {
+                        self.sessionSaveState = .complete
+                    }
+                }
+                DispatchQueue.main.asyncAfter(deadline: .now() + 5.0) {
+                    if self.sessionSaveState == .complete {
+                        self.sessionSaveState = .none
+                    }
+                }
             }
         }
 
@@ -241,7 +281,7 @@ class Workout: ObservableObject {
             let json = try jsonEncoder.encode(WorkoutsSaveData(workouts: newData))
             FileSystem().save(filename: "workouts.json", data: json)
         } catch {
-            print("could not save")
+            appLog("could not save")
         }
     }
     
@@ -273,7 +313,7 @@ class Workout: ObservableObject {
             }
             return []
         } catch {
-            print("Could not load workout data \(error)")
+            appLog("Could not load workout data \(error)")
             return []
         }
     }

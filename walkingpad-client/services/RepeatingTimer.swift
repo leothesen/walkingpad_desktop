@@ -13,11 +13,11 @@ class RepeatingTimer {
     
     func start() {
         if (self.timer != nil) {
-            NSLog("Timer is already running.")
+            appLog("Timer is already running.")
             return;
         }
         
-        NSLog("Starting timer");
+        appLog("Starting timer");
         let newTimer = Timer.scheduledTimer(withTimeInterval: self.interval, repeats: true) { _ in
             self.eventHandler()
         }
@@ -27,11 +27,11 @@ class RepeatingTimer {
     
     func stop() {
         guard let startedTimer = self.timer else {
-            NSLog("Cannot stop timer, as it is not yet started")
+            appLog("Cannot stop timer, as it is not yet started")
             return;
         }
         
-        NSLog("Stopping timer");
+        appLog("Stopping timer");
         startedTimer.invalidate();
         self.timer = nil;
     }

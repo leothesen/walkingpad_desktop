@@ -1,0 +1,118 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Select Xcode
+        run: sudo xcode-select -s /Applications/Xcode_16.3.app
+
+      - name: Cache SPM packages
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/Library/Developer/Xcode/DerivedData/**/SourcePackages
+            ~/Library/Caches/org.swift.swiftpm
+          key: spm-${{ hashFiles('walkingpad-client.xcodeproj/project.pbxproj') }}
+          restore-keys: spm-
+
+      - name: Extract version from tag
+        id: version
+        run: echo "version=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
+
+      - name: Set marketing version
+        run: |
+          sed -i '' "s/MARKETING_VERSION = .*;/MARKETING_VERSION = ${{ steps.version.outputs.version }};/g" \
+            walkingpad-client.xcodeproj/project.pbxproj
+
+      - name: Resolve packages
+        run: xcodebuild -resolvePackageDependencies -scheme walkingpad-client
+
+      - name: Build (Release)
+        run: |
+          xcodebuild -scheme walkingpad-client \
+            -configuration Release \
+            -derivedDataPath build \
+            -destination "platform=macOS,arch=arm64" \
+            CODE_SIGN_IDENTITY="-" \
+            -quiet
+
+      - name: Zip app bundle
+        run: |
+          cd build/Build/Products/Release
+          zip -r ../../../../WalkingPad-Client.zip "Walkingpad Client.app" -q
+
+      - name: Generate appcast
+        env:
+          SPARKLE_PRIVATE_KEY: ${{ secrets.SPARKLE_PRIVATE_KEY }}
+        run: |
+          # Download Sparkle tools
+          SPARKLE_VERSION="2.6.4"
+          curl -sL "https://github.com/sparkle-project/Sparkle/releases/download/${SPARKLE_VERSION}/Sparkle-${SPARKLE_VERSION}.tar.xz" \
+            | tar xJ -C /tmp
+
+          # Get zip file size and build date
+          FILE_SIZE=$(stat -f%z WalkingPad-Client.zip)
+          PUB_DATE=$(date -R)
+          VERSION="${{ steps.version.outputs.version }}"
+
+          # Generate EdDSA signature
+          SIGNATURE=$(/tmp/bin/sign_update WalkingPad-Client.zip -f <(echo "$SPARKLE_PRIVATE_KEY"))
+
+          # Generate appcast.xml
+          cat > appcast.xml << APPCAST_EOF
+          <?xml version="1.0" encoding="utf-8"?>
+          <rss version="2.0" xmlns:sparkle="http://www.andymatuschak.org/xml-namespaces/sparkle" xmlns:dc="http://purl.org/dc/elements/1.1/">
+            <channel>
+              <title>WalkingPad Client</title>
+              <link>https://github.com/leothesen/walkingpad_desktop</link>
+              <item>
+                <title>Version ${VERSION}</title>
+                <pubDate>${PUB_DATE}</pubDate>
+                <sparkle:version>${VERSION}</sparkle:version>
+                <sparkle:shortVersionString>${VERSION}</sparkle:shortVersionString>
+                <enclosure
+                  url="https://github.com/leothesen/walkingpad_desktop/releases/download/v${VERSION}/WalkingPad-Client.zip"
+                  length="${FILE_SIZE}"
+                  type="application/octet-stream"
+                  sparkle:edSignature="${SIGNATURE}"
+                />
+              </item>
+            </channel>
+          </rss>
+          APPCAST_EOF
+
+      - name: Create GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" \
+            WalkingPad-Client.zip \
+            --title "WalkingPad Client ${{ steps.version.outputs.version }}" \
+            --generate-notes
+
+      - name: Update appcast and version on main
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git fetch origin main
+          git checkout main
+          # Update version in project file
+          sed -i '' "s/MARKETING_VERSION = .*;/MARKETING_VERSION = ${{ steps.version.outputs.version }};/g" \
+            walkingpad-client.xcodeproj/project.pbxproj
+          cp appcast.xml appcast.xml
+          git add appcast.xml walkingpad-client.xcodeproj/project.pbxproj
+          git commit -m "chore: update version and appcast for v${{ steps.version.outputs.version }}"
+          git push origin main

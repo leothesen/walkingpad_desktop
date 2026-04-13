@@ -1,5 +1,6 @@
 import SwiftUI
 import Charts
+import Sparkle
 
 /// Root view for the floating stats window.
 /// Layout hierarchy: hero distance → trend chart → supporting metrics → consistency streak.
@@ -10,20 +11,43 @@ struct StatsWindowView: View {
     var stravaService: StravaService
     @State private var showDebug = false
     @State private var hoverFraction: CGFloat = 0.5
+    @State private var selectedRange: TimeRange = .week
 
     var body: some View {
-        GlassEffectContainer {
-            VStack(spacing: 14) {
+        VStack(spacing: 14) {
                 // Time range selector + debug toggle
                 HStack {
-                    Picker("Range", selection: $viewModel.selectedRange.animation(.spring(duration: 0.35))) {
+                    Picker(selection: $selectedRange) {
                         ForEach(TimeRange.allCases, id: \.self) { range in
                             Text(range.rawValue).tag(range)
                         }
+                    } label: {
+                        SwiftUI.EmptyView()
                     }
                     .pickerStyle(.segmented)
+                    .labelsHidden()
+                    .onChange(of: selectedRange) {
+                        DispatchQueue.main.async {
+                            viewModel.selectedRange = selectedRange
+                            viewModel.hoveredPoint = nil
+                        }
+                    }
 
-                    Button(action: { withAnimation(.spring(duration: 0.25)) { showDebug.toggle() } }) {
+                    Text("v\(Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "?")")
+                        .font(.caption2)
+                        .foregroundStyle(.tertiary)
+
+                    Button(action: {
+                        (NSApp.delegate as? AppDelegate)?.checkForUpdates()
+                    }) {
+                        Image(systemName: "arrow.down.circle")
+                            .font(.body)
+                            .foregroundStyle(.secondary)
+                    }
+                    .buttonStyle(.plain)
+                    .help("Check for updates")
+
+                    Button(action: { showDebug.toggle() }) {
                         Image(systemName: showDebug ? "ladybug.fill" : "ladybug")
                             .font(.body)
                             .foregroundStyle(showDebug ? .blue : .secondary)
@@ -69,11 +93,10 @@ struct StatsWindowView: View {
                         stravaService: stravaService
                     )
                     .frame(minHeight: 200)
-                    .transition(.move(edge: .bottom).combined(with: .opacity))
                 }
             }
             .padding(16)
-        }
+            .frame(minWidth: 460, minHeight: 400)
     }
 
     // MARK: - Hero Distance
@@ -93,8 +116,16 @@ struct StatsWindowView: View {
     // MARK: - Trend Chart
 
     private var trendChart: some View {
-        VStack(spacing: 0) {
-            // Tooltip sits above the chart
+        DistanceTrendChart(
+            points: viewModel.dailyPoints,
+            isMonthly: viewModel.selectedRange == .allTime,
+            hoveredPoint: $viewModel.hoveredPoint,
+            hoverFraction: $hoverFraction
+        )
+        .frame(height: 140)
+        .padding(12)
+        .background(.ultraThinMaterial, in: .rect(cornerRadius: 14))
+        .overlay(alignment: .top) {
             if let hovered = viewModel.hoveredPoint {
                 HStack(spacing: 6) {
                     Text(hovered.date, format: .dateTime.weekday(.abbreviated).month(.abbreviated).day())
@@ -108,19 +139,9 @@ struct StatsWindowView: View {
                 .padding(.horizontal, 8)
                 .padding(.vertical, 4)
                 .background(.ultraThinMaterial, in: Capsule())
-                .padding(.bottom, 4)
+                .offset(y: -14)
                 .transition(.opacity.animation(.easeOut(duration: 0.12)))
             }
-
-            DistanceTrendChart(
-                points: viewModel.dailyPoints,
-                isMonthly: viewModel.selectedRange == .allTime,
-                hoveredPoint: $viewModel.hoveredPoint,
-                hoverFraction: $hoverFraction
-            )
-            .frame(height: 140)
-            .padding(12)
-            .glassEffect(.regular, in: .rect(cornerRadius: 14))
         }
     }
 
@@ -168,7 +189,7 @@ struct StatsWindowView: View {
             workouts: viewModel.filteredWorkouts
         )
         .padding(12)
-        .glassEffect(.regular, in: .rect(cornerRadius: 14))
+        .background(.ultraThinMaterial, in: .rect(cornerRadius: 14))
     }
 }
 
@@ -196,6 +217,6 @@ struct MetricCard: View {
         }
         .frame(maxWidth: .infinity)
         .padding(.vertical, 10)
-        .glassEffect(.regular, in: .rect(cornerRadius: 10))
+        .background(.ultraThinMaterial, in: .rect(cornerRadius: 10))
     }
 }

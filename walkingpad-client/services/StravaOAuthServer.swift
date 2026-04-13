@@ -58,10 +58,10 @@ class StravaOAuthServer {
 
                 self.server = server
                 try server.start()
-                print("Strava OAuth server listening on port 8234")
+                appLog("Strava OAuth server listening on port 8234")
                 loop.runForever()
             } catch {
-                print("Strava OAuth server error: \(error)")
+                appLog("Strava OAuth server error: \(error)")
             }
         }
         thread?.name = "StravaOAuthServer"
@@ -75,6 +75,6 @@ class StravaOAuthServer {
         thread = nil
         server = nil
         loop = nil
-        print("Strava OAuth server stopped")
+        appLog("Strava OAuth server stopped")
     }
 }

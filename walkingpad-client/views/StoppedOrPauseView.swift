@@ -6,25 +6,48 @@ struct StoppedOrPausedView: View {
     @State private var showYesterdaySync: Bool = false
     @State private var showYesterdayConfirm: Bool = false
     @State private var isSyncingYesterday: Bool = false
+    @State private var isStarting: Bool = false
+    @State private var startingTime: Date? = nil
 
     var body: some View {
         VStack(spacing: 6) {
             WorkoutStateView()
 
-            Button(action: {
-                walkingPadService.command()?.start()
-            }) {
-                Text("Start")
-                    .font(.caption.weight(.semibold))
-                    .foregroundStyle(.green)
-                    .frame(maxWidth: .infinity)
-                    .contentShape(Capsule())
-            }
-            .buttonStyle(.plain)
-            .padding(.vertical, 4)
-            .glassEffect(.regular.tint(.green.opacity(0.1)).interactive(), in: .capsule)
+            if isStarting {
+                TimelineView(.periodic(from: .now, by: 0.25)) { timeline in
+                    let elapsed = startingTime.map { timeline.date.timeIntervalSince($0) } ?? 0
+                    let progress = min(elapsed / 3.0, 1.0)
 
-            if showYesterdaySync {
+                    VStack(spacing: 4) {
+                        Text("Starting")
+                            .font(.caption2.weight(.medium))
+                            .foregroundStyle(.green)
+                        ProgressView(value: progress, total: 1.0)
+                            .tint(.green)
+                    }
+                }
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 4)
+                .padding(.horizontal, 8)
+                .background(.green.opacity(0.1), in: .capsule)
+            } else {
+                Button(action: {
+                    isStarting = true
+                    startingTime = Date()
+                    walkingPadService.command()?.start()
+                }) {
+                    Text("Start")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(.green)
+                        .frame(maxWidth: .infinity)
+                        .contentShape(Capsule())
+                }
+                .buttonStyle(.plain)
+                .padding(.vertical, 4)
+                .background(.green.opacity(0.1), in: .capsule)
+            }
+
+            if showYesterdaySync && !isStarting {
                 if showYesterdayConfirm {
                     HStack(spacing: 6) {
                         Text("Sync yesterday to Strava?")
@@ -39,7 +62,7 @@ struct StoppedOrPausedView: View {
                         .buttonStyle(.plain)
                         .padding(.horizontal, 8)
                         .padding(.vertical, 3)
-                        .glassEffect(.regular.interactive(), in: .capsule)
+                        .background(.ultraThinMaterial, in: .capsule)
 
                         Button(action: {
                             showYesterdayConfirm = false
@@ -53,7 +76,7 @@ struct StoppedOrPausedView: View {
                         .buttonStyle(.plain)
                         .padding(.horizontal, 8)
                         .padding(.vertical, 3)
-                        .glassEffect(.regular.tint(.orange.opacity(0.1)).interactive(), in: .capsule)
+                        .background(.orange.opacity(0.1), in: .capsule)
                     }
                 } else {
                     Button(action: {
@@ -74,12 +97,16 @@ struct StoppedOrPausedView: View {
                     }
                     .buttonStyle(.plain)
                     .padding(.vertical, 3)
-                    .glassEffect(.regular.tint(.orange.opacity(0.1)).interactive(), in: .capsule)
+                    .background(.orange.opacity(0.1), in: .capsule)
                     .disabled(isSyncingYesterday)
                 }
             }
         }
-        .onAppear { checkYesterday() }
+        .onAppear {
+            checkYesterday()
+            isStarting = false
+            startingTime = nil
+        }
     }
 
     private func checkYesterday() {

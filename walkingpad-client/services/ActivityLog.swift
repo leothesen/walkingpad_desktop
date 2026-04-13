@@ -36,3 +36,8 @@ class ActivityLog: ObservableObject {
     func error(_ message: String) { log(message, type: .error) }
     func progress(_ message: String) { log(message, type: .progress) }
 }
+
+/// Global shorthand — routes all app logging through ActivityLog so it appears in the debug panel.
+func appLog(_ message: String, type: ActivityLogEntry.LogType = .info) {
+    ActivityLog.shared.log(message, type: type)
+}

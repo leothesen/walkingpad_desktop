@@ -40,7 +40,7 @@ open class BluetoothPeripheral: NSObject, CBPeripheralDelegate {
 
     /// Starts BLE service discovery for known WalkingPad service UUIDs.
     public func discover() {
-        print("discovering \(self.peripheral.name ?? "unknown")")
+        appLog("discovering \(self.peripheral.name ?? "unknown")")
         self.peripheral.delegate = self
         self.peripheral.discoverServices(BluetoothPeripheral.walkingPadServiceUUIDs)
     }
@@ -61,7 +61,7 @@ open class BluetoothPeripheral: NSObject, CBPeripheralDelegate {
     /// Inspects each characteristic, looking for FE01 (notify) and FE02 (command).
     /// Once all services have been processed, fires the identification callback.
     public func peripheral(_ peripheral: CBPeripheral, didDiscoverCharacteristicsFor service: CBService, error: Error?) {
-        print("Service uuid=\(service.uuid) description=\(service.description)")
+        appLog("Service uuid=\(service.uuid) description=\(service.description)")
         if let characteristics = service.characteristics {
             for characteristic in characteristics {
 

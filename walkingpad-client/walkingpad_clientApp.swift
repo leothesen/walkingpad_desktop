@@ -1,5 +1,6 @@
 import SwiftUI
 import UserNotifications
+import Sparkle
 
 /// Main app entry point. Uses a Settings scene with an empty view since this is a
 /// menu-bar-only app (LSUIElement = true in Info.plist hides it from the Dock).
@@ -30,8 +31,14 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     var notionService: NotionService { NotionService.shared }
     var stravaService: StravaService { StravaService.shared }
 
+    private let updaterController = SPUStandardUpdaterController(startingUpdater: false, updaterDelegate: nil, userDriverDelegate: nil)
+
     var popover: NSPopover!
     var statusBarItem: NSStatusItem!
+
+    func checkForUpdates() {
+        updaterController.checkForUpdates(nil)
+    }
 
     override init() {
         self.walkingPadService = WalkingPadService()
@@ -57,7 +64,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             Task {
                 let success = await self.notionService.pushSession(session, sessionNumber: sessionNumber)
                 if success {
-                    print("Notion push succeeded, clearing local workout data")
+                    appLog("Notion push succeeded, clearing local workout data")
                     if let emptyData = try? JSONEncoder().encode(WorkoutsSaveData(workouts: [])) {
                         FileSystem().save(filename: "workouts.json", data: emptyData)
                     }
@@ -95,7 +102,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
     /// Pauses all background services when the Mac goes to sleep.
     @objc func receiveSleepNotification(sender: AnyObject){
-        NSLog("Received sleep notification, stopping timer");
+        appLog("Received sleep notification, stopping timer");
         self.updateTimer?.stop();
         self.mqttService.stop()
     }
@@ -104,7 +111,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     /// Attempts to reconnect to the previously-known BLE peripheral after a 2-second delay
     /// to give CoreBluetooth time to reinitialize.
     @objc func receiveWakeNotification(sender: AnyObject) {
-        NSLog("Received wake notification, reinitializing services");
+        appLog("Received wake notification, reinitializing services");
 
         self.updateTimer?.stop()
         self.mqttService.stop()
@@ -129,9 +136,12 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
     /// Sets up the status bar menu item, starts the HTTP API server, and fetches today's stats.
     func applicationDidFinishLaunching(_ aNotification: Notification) {
+        // Start Sparkle auto-updater
+        updaterController.startUpdater()
+
         // Request notification permissions
         UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound]) { granted, _ in
-            print("Notification permission \(granted ? "granted" : "denied")")
+            appLog("Notification permission \(granted ? "granted" : "denied")")
         }
 
         // HTTP server runs on a background thread (blocks with loop.runForever())
@@ -187,12 +197,12 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         components.hour = 23
         components.minute = 59
         guard let fireDate = calendar.date(from: components), fireDate > Date() else {
-            print("Strava: 23:59 already passed today, skipping auto-post schedule")
+            appLog("Strava: 23:59 already passed today, skipping auto-post schedule")
             return
         }
 
         let interval = fireDate.timeIntervalSince(Date())
-        print("Strava: auto-post scheduled in \(Int(interval / 60)) minutes")
+        appLog("Strava: auto-post scheduled in \(Int(interval / 60)) minutes")
         DispatchQueue.main.asyncAfter(deadline: .now() + interval) { [weak self] in
             self?.autoPostToStrava()
         }
@@ -200,7 +210,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
     private func autoPostToStrava() {
         guard stravaService.isConnected, !stravaService.isSyncedToday else {
-            print("Strava: auto-post skipped (not connected or already synced)")
+            appLog("Strava: auto-post skipped (not connected or already synced)")
             scheduleStravaAutoPostForTomorrow()
             return
         }
@@ -208,9 +218,9 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         Task {
             if let sessions = await notionService.fetchTodaySessions(), !sessions.isEmpty {
                 let success = await stravaService.postTodayActivity(sessions: sessions, notionService: notionService)
-                print("Strava: auto-post \(success ? "succeeded" : "failed")")
+                appLog("Strava: auto-post \(success ? "succeeded" : "failed")")
             } else {
-                print("Strava: auto-post skipped (no sessions today)")
+                appLog("Strava: auto-post skipped (no sessions today)")
             }
             await MainActor.run {
                 self.scheduleStravaAutoPostForTomorrow()
@@ -227,7 +237,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         guard let fireDate = calendar.date(from: components) else { return }
 
         let interval = fireDate.timeIntervalSince(Date())
-        print("Strava: next auto-post in \(Int(interval / 3600)) hours")
+        appLog("Strava: next auto-post in \(Int(interval / 3600)) hours")
         DispatchQueue.main.asyncAfter(deadline: .now() + interval) { [weak self] in
             self?.autoPostToStrava()
         }
