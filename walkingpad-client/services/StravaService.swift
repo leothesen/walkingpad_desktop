@@ -3,6 +3,8 @@ import AppKit
 
 /// Strava integration: OAuth2 authentication, daily activity posting, sync state tracking.
 class StravaService: ObservableObject {
+    static let shared = StravaService()
+
     @Published var isConnected: Bool = false
     @Published var isSyncedToday: Bool = false
     @Published var isSyncing: Bool = false
@@ -195,7 +197,11 @@ class StravaService: ObservableObject {
         let totalDistance = sessions.reduce(0) { $0 + $1.distance }
         let totalSteps = sessions.reduce(0) { $0 + $1.steps }
         let totalSeconds = sessions.reduce(0) { $0 + Int($1.endTime.timeIntervalSince($1.startTime)) }
-        let firstStart = sessions.min(by: { $0.startTime < $1.startTime })!.startTime
+        guard let firstStart = sessions.min(by: { $0.startTime < $1.startTime })?.startTime else {
+            log.error("Strava: could not determine session start time")
+            await MainActor.run { isSyncing = false; lastError = "No valid sessions" }
+            return false
+        }
         let distKm = Double(totalDistance) / 1000.0
         let avgSpeed = totalSeconds > 0 ? (distKm / (Double(totalSeconds) / 3600.0)) : 0
 

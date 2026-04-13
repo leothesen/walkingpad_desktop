@@ -4,6 +4,7 @@ import CoreBluetooth
 /// Displayed when the treadmill is running (speed > 0).
 struct RunningView: View {
     @EnvironmentObject var walkingPadService: WalkingPadService
+    @EnvironmentObject var workout: Workout
 
     @State private var sliderSpeed: Double = 0
     @State private var isDragging: Bool = false
@@ -135,28 +136,52 @@ struct RunningView: View {
     private func stopAndFinishDay() {
         walkingPadService.command()?.setSpeed(speed: 0)
 
-        let notion: NotionService
-        let strava: StravaService
-        if let appDelegate = NSApp.delegate as? AppDelegate {
-            notion = appDelegate.notionService
-            strava = appDelegate.stravaService
-        } else {
-            notion = NotionService()
-            strava = StravaService()
-        }
+        let notion = NotionService.shared
+        let strava = StravaService.shared
 
-        // Wait a moment for the session to finalize, then post to Strava
         ActivityLog.shared.progress("Stopping treadmill, waiting for session to finalize…")
         Task {
-            try? await Task.sleep(for: .seconds(15))
-            ActivityLog.shared.progress("Fetching today's sessions from Notion…")
-            if let sessions = await notion.fetchTodaySessions(), !sessions.isEmpty {
+            // Poll until the current session ends (idle detection sets currentSessionStart to nil)
+            let deadline = Date().addingTimeInterval(30)
+            while await MainActor.run(body: { workout.currentSessionStart }) != nil {
+                if Date() > deadline {
+                    ActivityLog.shared.error("Timeout waiting for session to finalize")
+                    break
+                }
+                try? await Task.sleep(for: .seconds(1))
+            }
+
+            // Use in-memory sessions as primary source — always has the just-completed session
+            let localSessions = await MainActor.run { workout.todaySessions }
+
+            // Also fetch from Notion to capture sessions from before an app restart
+            let notionSessions = await notion.fetchTodaySessions() ?? []
+
+            // Merge both sources, deduplicating by start time
+            let sessions = mergeSessions(local: localSessions, remote: notionSessions)
+
+            if !sessions.isEmpty {
                 let success = await strava.postTodayActivity(sessions: sessions, notionService: notion)
                 ActivityLog.shared.info("Stop & Finish Day: \(success ? "completed" : "failed")")
             } else {
                 ActivityLog.shared.error("No sessions found for today")
             }
         }
+    }
+
+    /// Merges local in-memory sessions with Notion sessions, deduplicating by start time.
+    private func mergeSessions(local: [SessionSaveData], remote: [SessionSaveData]) -> [SessionSaveData] {
+        if local.isEmpty { return remote }
+        if remote.isEmpty { return local }
+
+        var merged = local
+        for remoteSession in remote {
+            let isDuplicate = local.contains { abs($0.startTime.timeIntervalSince(remoteSession.startTime)) < 60 }
+            if !isDuplicate {
+                merged.append(remoteSession)
+            }
+        }
+        return merged.sorted { $0.startTime < $1.startTime }
     }
 
     private func nudgeSpeed(_ delta: Double) {

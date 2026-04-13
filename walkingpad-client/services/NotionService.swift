@@ -3,6 +3,8 @@ import Foundation
 /// Notion API client for syncing walking sessions to a Notion database.
 /// Handles Keychain-based config storage, pushing sessions, and fetching all sessions.
 class NotionService: ObservableObject {
+    static let shared = NotionService()
+
     @Published var isConfigured: Bool = false
 
     private let baseURL = "https://api.notion.com/v1"
