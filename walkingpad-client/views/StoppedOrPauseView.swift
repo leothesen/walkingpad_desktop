@@ -4,6 +4,7 @@ import CoreBluetooth
 struct StoppedOrPausedView: View {
     @EnvironmentObject var walkingPadService: WalkingPadService
     @State private var showYesterdaySync: Bool = false
+    @State private var showYesterdayConfirm: Bool = false
     @State private var isSyncingYesterday: Bool = false
 
     var body: some View {
@@ -24,38 +25,72 @@ struct StoppedOrPausedView: View {
             .glassEffect(.regular.tint(.green.opacity(0.1)).interactive(), in: .capsule)
 
             if showYesterdaySync {
-                Button(action: { syncYesterday() }) {
-                    HStack(spacing: 4) {
-                        if isSyncingYesterday {
-                            ProgressView()
-                                .controlSize(.mini)
+                if showYesterdayConfirm {
+                    HStack(spacing: 6) {
+                        Text("Sync yesterday to Strava?")
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
+                        Spacer()
+                        Button(action: { showYesterdayConfirm = false }) {
+                            Text("Cancel")
+                                .font(.caption2.weight(.medium))
+                                .contentShape(Capsule())
                         }
-                        Text(isSyncingYesterday ? "Syncing…" : "Sync Yesterday to Strava")
+                        .buttonStyle(.plain)
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 3)
+                        .glassEffect(.regular.interactive(), in: .capsule)
+
+                        Button(action: {
+                            showYesterdayConfirm = false
+                            syncYesterday()
+                        }) {
+                            Text("Sync")
+                                .font(.caption2.weight(.medium))
+                                .foregroundStyle(.orange)
+                                .contentShape(Capsule())
+                        }
+                        .buttonStyle(.plain)
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 3)
+                        .glassEffect(.regular.tint(.orange.opacity(0.1)).interactive(), in: .capsule)
                     }
-                    .font(.caption2.weight(.medium))
-                    .foregroundStyle(.orange)
-                    .frame(maxWidth: .infinity)
-                    .contentShape(Capsule())
+                } else {
+                    Button(action: {
+                        StravaService.shared.clearUploadResult()
+                        showYesterdayConfirm = true
+                    }) {
+                        HStack(spacing: 4) {
+                            if isSyncingYesterday {
+                                ProgressView()
+                                    .controlSize(.mini)
+                            }
+                            Text(isSyncingYesterday ? "Syncing…" : "Sync Yesterday to Strava")
+                        }
+                        .font(.caption2.weight(.medium))
+                        .foregroundStyle(.orange)
+                        .frame(maxWidth: .infinity)
+                        .contentShape(Capsule())
+                    }
+                    .buttonStyle(.plain)
+                    .padding(.vertical, 3)
+                    .glassEffect(.regular.tint(.orange.opacity(0.1)).interactive(), in: .capsule)
+                    .disabled(isSyncingYesterday)
                 }
-                .buttonStyle(.plain)
-                .padding(.vertical, 3)
-                .glassEffect(.regular.tint(.orange.opacity(0.1)).interactive(), in: .capsule)
-                .disabled(isSyncingYesterday)
             }
         }
         .onAppear { checkYesterday() }
     }
 
     private func checkYesterday() {
-        guard let appDelegate = NSApp.delegate as? AppDelegate else { return }
-        let strava = appDelegate.stravaService
+        let strava = StravaService.shared
         showYesterdaySync = strava.yesterdayNeedsSync
     }
 
     private func syncYesterday() {
-        guard let appDelegate = NSApp.delegate as? AppDelegate else { return }
-        let notion = appDelegate.notionService
-        let strava = appDelegate.stravaService
+        let notion = NotionService.shared
+        let strava = StravaService.shared
+        strava.clearUploadResult()
 
         isSyncingYesterday = true
         Task {

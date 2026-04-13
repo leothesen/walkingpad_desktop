@@ -5,6 +5,8 @@ struct FooterView: View {
     @EnvironmentObject var walkingPadService: WalkingPadService
     @EnvironmentObject var workout: Workout
 
+    @State private var showUploadConfirm: Bool = false
+
     /// Singleton reference to prevent duplicate stats windows.
     private static var statsWindow: NSWindow?
 
@@ -12,35 +14,69 @@ struct FooterView: View {
     private var notionService: NotionService { NotionService.shared }
 
     var body: some View {
-        HStack(spacing: 6) {
-            Button(action: { openStatsWindow() }) {
-                Label("Stats", systemImage: "chart.bar")
-                    .font(.caption2.weight(.medium))
-                    .contentShape(Capsule())
+        VStack(spacing: 4) {
+            if showUploadConfirm {
+                HStack(spacing: 6) {
+                    Text("Upload to Strava?")
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                    Spacer()
+                    Button(action: { showUploadConfirm = false }) {
+                        Text("Cancel")
+                            .font(.caption2.weight(.medium))
+                            .contentShape(Capsule())
+                    }
+                    .buttonStyle(.plain)
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 3)
+                    .glassEffect(.regular.interactive(), in: .capsule)
+
+                    Button(action: {
+                        showUploadConfirm = false
+                        postToStrava()
+                    }) {
+                        Text("Upload")
+                            .font(.caption2.weight(.medium))
+                            .foregroundStyle(.orange)
+                            .contentShape(Capsule())
+                    }
+                    .buttonStyle(.plain)
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 3)
+                    .glassEffect(.regular.tint(.orange.opacity(0.1)).interactive(), in: .capsule)
+                }
             }
-            .buttonStyle(.plain)
-            .padding(.horizontal, 8)
-            .padding(.vertical, 3)
-            .glassEffect(.regular.interactive(), in: .capsule)
 
-            stravaButton
+            HStack(spacing: 6) {
+                Button(action: { openStatsWindow() }) {
+                    Label("Stats", systemImage: "chart.bar")
+                        .font(.caption2.weight(.medium))
+                        .contentShape(Capsule())
+                }
+                .buttonStyle(.plain)
+                .padding(.horizontal, 8)
+                .padding(.vertical, 3)
+                .glassEffect(.regular.interactive(), in: .capsule)
 
-            Spacer()
+                stravaButton
 
-            Button(action: {
-                walkingPadService.command()?.setSpeed(speed: 0)
-                workout.save()
-                NSApplication.shared.terminate(nil)
-            }) {
-                Text("Quit")
-                    .font(.caption2.weight(.medium))
-                    .foregroundStyle(.secondary)
-                    .contentShape(Capsule())
+                Spacer()
+
+                Button(action: {
+                    walkingPadService.command()?.setSpeed(speed: 0)
+                    workout.save()
+                    NSApplication.shared.terminate(nil)
+                }) {
+                    Text("Quit")
+                        .font(.caption2.weight(.medium))
+                        .foregroundStyle(.secondary)
+                        .contentShape(Capsule())
+                }
+                .buttonStyle(.plain)
+                .padding(.horizontal, 8)
+                .padding(.vertical, 3)
+                .glassEffect(.regular.interactive(), in: .capsule)
             }
-            .buttonStyle(.plain)
-            .padding(.horizontal, 8)
-            .padding(.vertical, 3)
-            .glassEffect(.regular.interactive(), in: .capsule)
         }
     }
 
@@ -69,7 +105,7 @@ struct FooterView: View {
                 .foregroundStyle(.green)
                 .help("Synced to Strava today")
         } else if strava.lastError != nil {
-            Button(action: { postToStrava() }) {
+            Button(action: { showUploadConfirm = true; strava.clearUploadResult() }) {
                 Image(systemName: "exclamationmark.circle")
                     .font(.caption2)
                     .foregroundStyle(.red)
@@ -81,7 +117,7 @@ struct FooterView: View {
             .glassEffect(.regular.interactive(), in: .capsule)
             .help(strava.lastError ?? "Error")
         } else {
-            Button(action: { postToStrava() }) {
+            Button(action: { showUploadConfirm = true; strava.clearUploadResult() }) {
                 Image(systemName: "square.and.arrow.up")
                     .font(.caption2)
                     .foregroundStyle(.orange)
@@ -98,9 +134,15 @@ struct FooterView: View {
     private func postToStrava() {
         let strava = stravaService
         let notion = notionService
+        strava.clearUploadResult()
         Task {
             if let sessions = await notion.fetchTodaySessions(), !sessions.isEmpty {
                 _ = await strava.postTodayActivity(sessions: sessions, notionService: notion)
+            } else {
+                await MainActor.run {
+                    strava.uploadResultMessage = "No sessions found for today"
+                    strava.uploadResultIsError = true
+                }
             }
         }
     }
