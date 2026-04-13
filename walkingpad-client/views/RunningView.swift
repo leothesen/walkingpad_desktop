@@ -67,60 +67,112 @@ struct RunningView: View {
                 }
             }
 
-            Button(action: {
-                walkingPadService.command()?.setSpeed(speed: 0)
-            }) {
-                Text("Stop")
-                    .font(.caption.weight(.semibold))
-                    .foregroundStyle(.red)
-                    .frame(maxWidth: .infinity)
-                    .contentShape(Capsule())
-            }
-            .buttonStyle(.plain)
-            .padding(.vertical, 4)
-            .background(.red.opacity(0.1), in: .capsule)
-
-            if showFinishConfirm {
-                HStack(spacing: 6) {
-                    Text("Post to Strava?")
-                        .font(.caption2)
-                        .foregroundStyle(.secondary)
-                    Spacer()
-                    Button(action: { showFinishConfirm = false }) {
-                        Text("No")
+            if workout.isStopping || workout.idleProgress > 0 || workout.sessionSaveState != .none {
+                // Stopping / idle detection / saving — replaces Stop buttons
+                if workout.sessionSaveState == .saving {
+                    HStack(spacing: 6) {
+                        ProgressView()
+                            .controlSize(.mini)
+                        Text("Saving session…")
                             .font(.caption2.weight(.medium))
-                            .frame(width: 40)
-                            .contentShape(Capsule())
+                            .foregroundStyle(.secondary)
                     }
-                    .buttonStyle(.plain)
-                    .padding(.vertical, 3)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 4)
                     .background(.ultraThinMaterial, in: .capsule)
-
-                    Button(action: {
-                        showFinishConfirm = false
-                        stopAndFinishDay()
-                    }) {
-                        Text("Yes")
+                } else if workout.sessionSaveState == .uploading {
+                    HStack(spacing: 6) {
+                        ProgressView()
+                            .controlSize(.mini)
+                        Text("Uploading to Strava…")
                             .font(.caption2.weight(.medium))
                             .foregroundStyle(.orange)
-                            .frame(width: 40)
+                    }
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 4)
+                    .background(.orange.opacity(0.1), in: .capsule)
+                } else if workout.sessionSaveState == .complete {
+                    HStack(spacing: 4) {
+                        Image(systemName: "checkmark.circle.fill")
+                            .font(.caption2)
+                            .foregroundStyle(.green)
+                        Text("Complete")
+                            .font(.caption2.weight(.medium))
+                            .foregroundStyle(.green)
+                    }
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 4)
+                    .background(.green.opacity(0.1), in: .capsule)
+                } else {
+                    VStack(spacing: 4) {
+                        Text("Stopping")
+                            .font(.caption2.weight(.medium))
+                            .foregroundStyle(.red)
+                        ProgressView(value: Double(workout.idleProgress), total: 3)
+                            .tint(.red)
+                    }
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 4)
+                    .padding(.horizontal, 8)
+                    .background(.red.opacity(0.1), in: .capsule)
+                }
+            } else {
+                Button(action: {
+                    workout.isStopping = true
+                    walkingPadService.command()?.setSpeed(speed: 0)
+                }) {
+                    Text("Stop")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(.red)
+                        .frame(maxWidth: .infinity)
+                        .contentShape(Capsule())
+                }
+                .buttonStyle(.plain)
+                .padding(.vertical, 4)
+                .background(.red.opacity(0.1), in: .capsule)
+
+                if showFinishConfirm {
+                    HStack(spacing: 6) {
+                        Text("Post to Strava?")
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
+                        Spacer()
+                        Button(action: { showFinishConfirm = false }) {
+                            Text("No")
+                                .font(.caption2.weight(.medium))
+                                .frame(width: 40)
+                                .contentShape(Capsule())
+                        }
+                        .buttonStyle(.plain)
+                        .padding(.vertical, 3)
+                        .background(.ultraThinMaterial, in: .capsule)
+
+                        Button(action: {
+                            showFinishConfirm = false
+                            stopAndFinishDay()
+                        }) {
+                            Text("Yes")
+                                .font(.caption2.weight(.medium))
+                                .foregroundStyle(.orange)
+                                .frame(width: 40)
+                                .contentShape(Capsule())
+                        }
+                        .buttonStyle(.plain)
+                        .padding(.vertical, 3)
+                        .background(.orange.opacity(0.1), in: .capsule)
+                    }
+                } else {
+                    Button(action: { showFinishConfirm = true }) {
+                        Text("Stop & Finish Day")
+                            .font(.caption2.weight(.medium))
+                            .foregroundStyle(.orange)
+                            .frame(maxWidth: .infinity)
                             .contentShape(Capsule())
                     }
                     .buttonStyle(.plain)
                     .padding(.vertical, 3)
                     .background(.orange.opacity(0.1), in: .capsule)
                 }
-            } else {
-                Button(action: { showFinishConfirm = true }) {
-                    Text("Stop & Finish Day")
-                        .font(.caption2.weight(.medium))
-                        .foregroundStyle(.orange)
-                        .frame(maxWidth: .infinity)
-                        .contentShape(Capsule())
-                }
-                .buttonStyle(.plain)
-                .padding(.vertical, 3)
-                .background(.orange.opacity(0.1), in: .capsule)
             }
         }
         .onAppear { sliderSpeed = max(currentSpeed, 0.5) }
@@ -134,6 +186,7 @@ struct RunningView: View {
     }
 
     private func stopAndFinishDay() {
+        workout.isStopping = true
         walkingPadService.command()?.setSpeed(speed: 0)
 
         let notion = NotionService.shared
@@ -151,6 +204,9 @@ struct RunningView: View {
                 try? await Task.sleep(for: .seconds(1))
             }
 
+            // Session saved — now upload to Strava
+            await MainActor.run { workout.sessionSaveState = .uploading }
+
             // Use in-memory sessions as primary source — always has the just-completed session
             let localSessions = await MainActor.run { workout.todaySessions }
 
@@ -165,6 +221,16 @@ struct RunningView: View {
                 ActivityLog.shared.info("Stop & Finish Day: \(success ? "completed" : "failed")")
             } else {
                 ActivityLog.shared.error("No sessions found for today")
+            }
+
+            await MainActor.run {
+                workout.sessionSaveState = .complete
+            }
+            try? await Task.sleep(for: .seconds(5))
+            await MainActor.run {
+                if workout.sessionSaveState == .complete {
+                    workout.sessionSaveState = .none
+                }
             }
         }
     }

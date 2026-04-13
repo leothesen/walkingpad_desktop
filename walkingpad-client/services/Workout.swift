@@ -56,6 +56,20 @@ class Workout: ObservableObject {
     private var consecutiveZeroStepUpdates: Int = 0
     private let zeroStepThreshold: Int = 3  // ~12 seconds at 4s polling
 
+    /// Idle detection progress shown in the UI (0 when not idle, 1...threshold during detection).
+    @Published public var idleProgress: Int = 0
+    /// Set when user explicitly taps Stop — triggers immediate idle UI.
+    @Published public var isStopping: Bool = false
+    /// Session save state shown in the UI.
+    @Published public var sessionSaveState: SessionSaveState = .none
+
+    enum SessionSaveState: Equatable {
+        case none
+        case saving
+        case uploading
+        case complete
+    }
+
     /// Tracks whether we've already sent the 60-min notification for the current session.
     private var hasNotifiedForCurrentSession: Bool = false
 
@@ -150,6 +164,11 @@ class Workout: ObservableObject {
             self.currentSessionDistance = 0
             self.consecutiveZeroStepUpdates = 0
             self.hasNotifiedForCurrentSession = false
+            DispatchQueue.main.async {
+                self.idleProgress = 0
+                self.isStopping = false
+                self.sessionSaveState = .none
+            }
         }
 
         // Also start a session if we're getting steps but no session is active
@@ -170,12 +189,18 @@ class Workout: ObservableObject {
             // Check if we need to send the 60-minute notification
             sendWalkingDurationNotificationIfNeeded()
 
-            // Track consecutive zero-step updates to detect belt stop
-            if stepDiff == 0 {
+            // Track consecutive zero-step updates to detect belt stop.
+            // Only start counting after we've seen at least one step in this session
+            // to avoid false idle on session start.
+            if stepDiff == 0 && self.currentSessionSteps > 0 {
                 self.consecutiveZeroStepUpdates += 1
                 appLog("SESSION IDLE: \(self.consecutiveZeroStepUpdates)/\(self.zeroStepThreshold) zero-step updates, speed=\(newState.speed)")
             } else {
                 self.consecutiveZeroStepUpdates = 0
+            }
+            // Update idle progress for UI
+            DispatchQueue.main.async {
+                self.idleProgress = self.consecutiveZeroStepUpdates
             }
         }
 
@@ -211,12 +236,27 @@ class Workout: ObservableObject {
             self.sessionDistance = self.currentSessionDistance
 
             if let session = completedSession {
+                self.idleProgress = 0
+                self.isStopping = false
+                self.sessionSaveState = .saving
                 appLog("SESSION COMPLETE: appending session #\(self.todaySessions.count + 1), steps=\(session.steps), dist=\(session.distance)")
                 self.todaySessions.append(session)
                 self.sessionSteps = 0
                 self.sessionDistance = 0
                 self.save()
                 self.onSessionComplete?(session, self.todaySessions.count)
+                // Show "complete" after a short delay, then clear — unless
+                // stopAndFinishDay takes over and drives its own states
+                DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
+                    if self.sessionSaveState == .saving {
+                        self.sessionSaveState = .complete
+                    }
+                }
+                DispatchQueue.main.asyncAfter(deadline: .now() + 5.0) {
+                    if self.sessionSaveState == .complete {
+                        self.sessionSaveState = .none
+                    }
+                }
             }
         }
 
