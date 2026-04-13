@@ -36,6 +36,10 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     var popover: NSPopover!
     var statusBarItem: NSStatusItem!
 
+    func checkForUpdates() {
+        updaterController.checkForUpdates(nil)
+    }
+
     override init() {
         self.walkingPadService = WalkingPadService()
         self.bluetoothDiscoverService = BluetoothDiscoveryService(walkingPadService)

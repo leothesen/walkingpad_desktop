@@ -1,5 +1,6 @@
 import SwiftUI
 import Charts
+import Sparkle
 
 /// Root view for the floating stats window.
 /// Layout hierarchy: hero distance → trend chart → supporting metrics → consistency streak.
@@ -31,6 +32,20 @@ struct StatsWindowView: View {
                             viewModel.hoveredPoint = nil
                         }
                     }
+
+                    Text("v\(Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "?")")
+                        .font(.caption2)
+                        .foregroundStyle(.tertiary)
+
+                    Button(action: {
+                        (NSApp.delegate as? AppDelegate)?.checkForUpdates()
+                    }) {
+                        Image(systemName: "arrow.down.circle")
+                            .font(.body)
+                            .foregroundStyle(.secondary)
+                    }
+                    .buttonStyle(.plain)
+                    .help("Check for updates")
 
                     Button(action: { showDebug.toggle() }) {
                         Image(systemName: showDebug ? "ladybug.fill" : "ladybug")
