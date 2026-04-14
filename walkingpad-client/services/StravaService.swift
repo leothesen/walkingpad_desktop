@@ -16,6 +16,9 @@ class StravaService: ObservableObject {
     @Published var uploadResultMessage: String? = nil
     @Published var uploadResultIsError: Bool = false
 
+    /// The date when isSyncedToday was last set to true, used for day-rollover reset.
+    private var syncedDate: Date?
+
     private var clientId: String?
     private var clientSecret: String?
 
@@ -43,6 +46,14 @@ class StravaService: ObservableObject {
         f.dateFormat = "yyyy-MM-dd"
         return f
     }()
+
+    /// Resets isSyncedToday to false if the day has changed since it was set.
+    func resetIfDateChanged() {
+        if let syncedDate = syncedDate, !Calendar.current.isDateInToday(syncedDate) {
+            isSyncedToday = false
+            self.syncedDate = nil
+        }
+    }
 
     var isClientConfigured: Bool {
         clientId != nil && clientSecret != nil && !(clientId?.isEmpty ?? true) && !(clientSecret?.isEmpty ?? true)
@@ -180,7 +191,7 @@ class StravaService: ObservableObject {
             log.progress("Checking if already posted today…")
             if let dayTotal = await notion.fetchDayTotal(for: Date()), dayTotal.stravaPosted {
                 log.info("Already posted to Strava today")
-                await MainActor.run { isSyncedToday = true }
+                await MainActor.run { isSyncedToday = true; syncedDate = Date() }
                 return true
             }
         }
@@ -251,6 +262,7 @@ class StravaService: ObservableObject {
                 await MainActor.run {
                     isSyncing = false
                     isSyncedToday = true
+                    syncedDate = Date()
                     lastStravaSync = Date()
                     unsyncedSessionCount = 0
                     unsyncedDateLabel = nil
@@ -331,7 +343,7 @@ class StravaService: ObservableObject {
         if !isSyncedToday {
             let todayPosted = await notionService.isStravaPosted(for: Date())
             if todayPosted {
-                await MainActor.run { isSyncedToday = true }
+                await MainActor.run { isSyncedToday = true; syncedDate = Date() }
             } else {
                 let todaySessions = await notionService.fetchSessions(for: Date())
                 let todayCount = todaySessions?.count ?? 0
