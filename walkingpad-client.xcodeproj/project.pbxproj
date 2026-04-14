@@ -468,7 +468,7 @@ C300000200000000000000CC /* DebugView.swift in Sources */,
 					"@executable_path/../Frameworks",
 				);
 				MACOSX_DEPLOYMENT_TARGET = 15.0;
-				MARKETING_VERSION = 1.1.10;
+				MARKETING_VERSION = 1.1.11;
 				PRODUCT_BUNDLE_IDENTIFIER = "klassm.walkingpad-client";
 				PRODUCT_NAME = "Walkingpad Client";
 				SWIFT_EMIT_LOC_STRINGS = YES;
@@ -497,7 +497,7 @@ C300000200000000000000CC /* DebugView.swift in Sources */,
 					"@executable_path/../Frameworks",
 				);
 				MACOSX_DEPLOYMENT_TARGET = 15.0;
-				MARKETING_VERSION = 1.1.10;
+				MARKETING_VERSION = 1.1.11;
 				PRODUCT_BUNDLE_IDENTIFIER = "klassm.walkingpad-client";
 				PRODUCT_NAME = "Walkingpad Client";
 				SWIFT_EMIT_LOC_STRINGS = YES;

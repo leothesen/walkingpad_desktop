@@ -4,15 +4,15 @@
     <title>WalkingPad Client</title>
     <link>https://github.com/leothesen/walkingpad_desktop</link>
     <item>
-      <title>Version 1.1.10</title>
-      <pubDate>Tue, 14 Apr 2026 09:25:29 +0000</pubDate>
-      <sparkle:version>1.1.10</sparkle:version>
-      <sparkle:shortVersionString>1.1.10</sparkle:shortVersionString>
+      <title>Version 1.1.11</title>
+      <pubDate>Tue, 14 Apr 2026 13:53:10 +0000</pubDate>
+      <sparkle:version>1.1.11</sparkle:version>
+      <sparkle:shortVersionString>1.1.11</sparkle:shortVersionString>
       <enclosure
-        url="https://github.com/leothesen/walkingpad_desktop/releases/download/v1.1.10/WalkingPad-Client.zip"
-        length="11639273"
+        url="https://github.com/leothesen/walkingpad_desktop/releases/download/v1.1.11/WalkingPad-Client.zip"
+        length="11640478"
         type="application/octet-stream"
-        sparkle:edSignature="gPoNwLCC+AsGGxlIhuiLS6JavyiyrU1Pcrd3St1CltJ96WHHrUuBZH1MdfV/Xjp53zOql8+ZNW3L/KiIpeWmAg=="
+        sparkle:edSignature="afuMNi/1jp98tODTYmM4nxMip7909pv66q+6i+6r9Lg6XcYL3xETm6iMMsqHXt976eC2kX69O7TJQ1rNpt+UDQ=="
       />
     </item>
   </channel>
