@@ -214,6 +214,7 @@ struct RunningView: View {
 
         let notion = NotionService.shared
         let strava = StravaService.shared
+        let hadActiveSession = workout.currentSessionStart != nil
 
         ActivityLog.shared.progress("Stopping treadmill, waiting for session to finalize…")
         Task {
@@ -225,6 +226,21 @@ struct RunningView: View {
                     break
                 }
                 try? await Task.sleep(for: .seconds(1))
+            }
+
+            // currentSessionStart is cleared on the BLE thread, but todaySessions
+            // is updated inside a DispatchQueue.main.async block. Wait for
+            // sessionSaveState to transition away from .none to confirm the
+            // session has been appended to todaySessions.
+            if hadActiveSession {
+                let saveDeadline = Date().addingTimeInterval(5)
+                while await MainActor.run(body: { workout.sessionSaveState == .none }) {
+                    if Date() > saveDeadline {
+                        ActivityLog.shared.error("Timeout waiting for session to save to memory")
+                        break
+                    }
+                    try? await Task.sleep(for: .seconds(0.2))
+                }
             }
 
             // Session saved — now upload to Strava
