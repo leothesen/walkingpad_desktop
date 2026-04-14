@@ -58,8 +58,8 @@ public class WalkingPadCommand {
     /// after a delay to allow the treadmill to initialize.
     public func wakeAndStart() {
         setWalkingMode(mode: .manual)
-        DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) { [weak self] in
-            self?.start()
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
+            self.start()
         }
     }
 
