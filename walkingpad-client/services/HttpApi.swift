@@ -65,7 +65,7 @@ func startHttpServer(walkingPadService: WalkingPadService, workout: Workout) {
             }
 
             if (path == "/treadmill/start") {
-                command.start()
+                command.wakeAndStart()
                 sendSuccess()
                 return
             }
@@ -74,7 +74,7 @@ func startHttpServer(walkingPadService: WalkingPadService, workout: Workout) {
             if (path == "/treadmill/faster") {
                 let speed = walkingPadService.lastStatus()?.speed
                 if (speed == nil) {
-                    command.start()
+                    command.wakeAndStart()
                 } else {
                     command.setSpeed(speed: UInt8((speed ?? 0) + 5))
                 }

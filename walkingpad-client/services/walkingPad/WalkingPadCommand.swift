@@ -54,6 +54,15 @@ public class WalkingPadCommand {
         self.executeCommand(command: [247, 162, 4, 1, 0xff, 253])
     }
 
+    /// Wakes the treadmill from standby by setting manual mode, then starts the belt
+    /// after a delay to allow the treadmill to initialize.
+    public func wakeAndStart() {
+        setWalkingMode(mode: .manual)
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) { [weak self] in
+            self?.start()
+        }
+    }
+
     /// Switches between manual and automatic walking modes.
     /// Manual mode allows direct speed control; automatic mode uses the treadmill's built-in program.
     public func setWalkingMode(mode: WalkingMode) {

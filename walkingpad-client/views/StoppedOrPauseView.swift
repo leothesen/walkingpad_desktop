@@ -34,7 +34,7 @@ struct StoppedOrPausedView: View {
                 Button(action: {
                     isStarting = true
                     startingTime = Date()
-                    walkingPadService.command()?.start()
+                    walkingPadService.command()?.wakeAndStart()
                 }) {
                     Text("Start")
                         .font(.caption.weight(.semibold))
