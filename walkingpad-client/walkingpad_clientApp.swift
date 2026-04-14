@@ -50,6 +50,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         // Note: the interval parameter is currently ignored by RepeatingTimer (hardcodes 4s).
         self.updateTimer = RepeatingTimer(interval: 5, eventHandler: {
             self.workout.resetIfDateChanged()
+            self.stravaService.resetIfDateChanged()
             self.walkingPadService.command()?.updateStatus()
         })
 
@@ -125,6 +126,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         }
 
         self.workout.resetIfDateChanged()
+        self.stravaService.resetIfDateChanged()
 
         // Re-check if yesterday's sessions need syncing (relevant after overnight sleep)
         Task {
