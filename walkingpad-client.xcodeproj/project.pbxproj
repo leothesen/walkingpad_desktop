@@ -617,6 +617,7 @@ C300000200000000000000CC /* DebugView.swift in Sources */,
 		J100006000000000000000DD /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
+				ARCHS = arm64;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_ENTITLEMENTS = WalkingPadWidget/WalkingPadWidget.entitlements;
 				CODE_SIGN_IDENTITY = "-";
@@ -643,6 +644,7 @@ C300000200000000000000CC /* DebugView.swift in Sources */,
 		J100006100000000000000DD /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
+				ARCHS = arm64;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_ENTITLEMENTS = WalkingPadWidget/WalkingPadWidget.entitlements;
 				CODE_SIGN_IDENTITY = "-";
