@@ -122,14 +122,14 @@ open class WalkingPadService: NSObject, CBPeripheralDelegate, ObservableObject {
 
     /// Decodes a big-endian multi-byte integer from an array of UInt8 values.
     /// For example, [0x01, 0x02, 0x03] → 1*65536 + 2*256 + 3 = 66051.
-    private func sumFrom(_ values: [UInt8]) -> Int {
+    static func sumFrom(_ values: [UInt8]) -> Int {
         return values.reduce(0, { acc, value in acc * 256 + Int(value) })
     }
 
     /// Identifies the status type from the first two bytes of a notification.
     /// - 0xF8 0xA2 (248, 162) → current real-time status
     /// - 0xF8 0xA7 (248, 167) → last session summary
-    private func statusTypeFrom(_ bits: [UInt8]) -> StatusType? {
+    static func statusTypeFrom(_ bits: [UInt8]) -> StatusType? {
         if (bits[0] == 248 && bits[1] == 162) {
             return .currentStatus
         }
@@ -149,7 +149,7 @@ open class WalkingPadService: NSObject, CBPeripheralDelegate, ObservableObject {
             let hexString = byteArray.map { String(format: "%02x", $0) }.joined(separator: " ")
             log("RX [\(byteArray.count)B] \(hexString)")
 
-            guard let statusType = statusTypeFrom(Array(byteArray[0...2])) else { return }
+            guard let statusType = WalkingPadService.statusTypeFrom(Array(byteArray[0...2])) else { return }
             guard let connection = self.connection else { return }
 
             // Need at least 14 bytes to read steps at index 11-13
@@ -169,9 +169,9 @@ open class WalkingPadService: NSObject, CBPeripheralDelegate, ObservableObject {
             } else {
                 mode = .automatic
             }
-            let distance = sumFrom(Array(byteArray[8...10])) * 10
-            let steps = sumFrom(Array(byteArray[11...13]))
-            let walkingTimeSeconds = sumFrom(Array(byteArray[5...7]))
+            let distance = WalkingPadService.sumFrom(Array(byteArray[8...10])) * 10
+            let steps = WalkingPadService.sumFrom(Array(byteArray[11...13]))
+            let walkingTimeSeconds = WalkingPadService.sumFrom(Array(byteArray[5...7]))
 
             let type = statusType == .currentStatus ? "curr" : "last"
             let modeStr: String

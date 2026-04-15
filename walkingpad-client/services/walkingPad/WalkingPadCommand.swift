@@ -21,7 +21,7 @@ public class WalkingPadCommand {
     /// Computes the checksum for a command byte array.
     /// Sums all bytes between the first byte (start marker) and the last two bytes
     /// (checksum + end marker), using UInt8 wrapping addition to handle overflow.
-    private func fixChecksum(values: [UInt8]) -> [UInt8] {
+    static func fixChecksum(values: [UInt8]) -> [UInt8] {
         let elements: [UInt8] = values.dropFirst().dropLast(2)
         let checksum: UInt8 = elements.reduce(0, {a, b in a.addingReportingOverflow(UInt8(b)).partialValue});
         var copy = Array(values)
@@ -31,7 +31,7 @@ public class WalkingPadCommand {
 
     /// Writes a command to the FE02 characteristic (write without response).
     public func executeCommand(command: [UInt8]) {
-        let withChecksum = self.fixChecksum(values: command)
+        let withChecksum = WalkingPadCommand.fixChecksum(values: command)
         let data = Data(withChecksum)
 
         let characteristic = self.connection.commandCharacteristic

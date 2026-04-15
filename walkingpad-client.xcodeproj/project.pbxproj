@@ -98,6 +98,10 @@
 		E100000100000000000000AA /* GlobalHotkeyService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GlobalHotkeyService.swift; sourceTree = "<group>"; };
 		E100000300000000000000AA /* StatsOverlayController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StatsOverlayController.swift; sourceTree = "<group>"; };
 		E100000500000000000000AA /* StatsOverlayView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StatsOverlayView.swift; sourceTree = "<group>"; };
+		T00000010000000000000001 /* WalkingPadCommandTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WalkingPadCommandTests.swift; sourceTree = "<group>"; };
+		T00000010000000000000002 /* WalkingPadServiceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WalkingPadServiceTests.swift; sourceTree = "<group>"; };
+		T00000010000000000000003 /* ActivityLogTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ActivityLogTests.swift; sourceTree = "<group>"; };
+		T00000010000000000000004 /* DeviceStateTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeviceStateTests.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -124,6 +128,7 @@
 		5B2C72CC263468B800CE4F88 = {
 			isa = PBXGroup;
 			children = (
+				T00000020000000000000001 /* walkingpad-clientTests */,
 				5B2C72D7263468B800CE4F88 /* walkingpad-client */,
 				J100003000000000000000CC /* WalkingPadWidget */,
 				5B2C72D6263468B800CE4F88 /* Products */,
@@ -258,6 +263,17 @@
 				J100000600000000000000BB /* Assets.xcassets */,
 			);
 			path = WalkingPadWidget;
+			sourceTree = "<group>";
+		};
+		T00000020000000000000001 /* walkingpad-clientTests */ = {
+			isa = PBXGroup;
+			children = (
+				T00000010000000000000001 /* WalkingPadCommandTests.swift */,
+				T00000010000000000000002 /* WalkingPadServiceTests.swift */,
+				T00000010000000000000003 /* ActivityLogTests.swift */,
+				T00000010000000000000004 /* DeviceStateTests.swift */,
+			);
+			path = "walkingpad-clientTests";
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */

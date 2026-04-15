@@ -25,6 +25,9 @@ jobs:
       - name: Resolve packages
         run: xcodebuild -resolvePackageDependencies -scheme walkingpad-client
 
+      - name: Run Tests (Swift PM)
+        run: swift test --parallel
+
       - name: Build (Release)
         run: |
           xcodebuild -scheme walkingpad-client \

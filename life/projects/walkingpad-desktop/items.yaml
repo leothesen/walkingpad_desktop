@@ -1,0 +1,12 @@
+- id: codebase-research
+  fact: The project is a SwiftUI-based macOS menu-bar app using Bluetooth LE for treadmill control.
+  date: 2026-04-15
+- id: services-identified
+  fact: Core services include WalkingPadService (BLE), Workout (session tracking), NotionService (sync), and StravaService (sync).
+  date: 2026-04-15
+- id: persistence-method
+  fact: Data and config are persisted via JSON files in the app container's Autosave Information directory.
+  date: 2026-04-15
+- id: session-detection
+  fact: Session boundaries are detected using speed transitions and idle detection (consecutive zero-step updates).
+  date: 2026-04-15
