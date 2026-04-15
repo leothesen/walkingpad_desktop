@@ -27,8 +27,12 @@ jobs:
 
       - name: Build (Release)
         run: |
+          set -o pipefail
           xcodebuild -scheme walkingpad-client \
             -configuration Release \
             -destination "platform=macOS,arch=arm64" \
             CODE_SIGN_IDENTITY="-" \
-            -quiet
+            2>&1 | tee /tmp/build.log | grep -E "^/.*(error|warning):" || true
+          echo "---SUMMARY---"
+          tail -5 /tmp/build.log
+          grep -c "error:" /tmp/build.log && exit 1 || exit 0
