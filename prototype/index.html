@@ -1,0 +1,503 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WalkingPad Desktop Prototype - Liquid Glass UI</title>
+    <style>
+        :root {
+            --accent-blue: #0A84FF;
+            --accent-green: #30D158;
+            --accent-orange: #FF9F0A;
+            --accent-red: #FF453A;
+            --text-primary: #FFFFFF;
+            --text-secondary: #8E8E93;
+            --glass-bg: rgba(255, 255, 255, 0.05);
+            --glass-border: rgba(255, 255, 255, 0.1);
+            --font-main: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol";
+            --font-rounded: "SF Pro Rounded", var(--font-main);
+            --font-mono: "SF Mono", "ui-monospace", SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+        }
+
+        body {
+            background-color: #1a1a1a;
+            color: var(--text-primary);
+            font-family: var(--font-rounded);
+            margin: 0;
+            padding: 40px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-height: 100vh;
+            background-image: radial-gradient(circle at top right, #2c3e50, #1a1a1a);
+        }
+
+        h1 {
+            font-weight: 700;
+            margin-bottom: 24px;
+            font-size: 24px;
+            color: var(--text-secondary);
+        }
+
+        .container {
+            display: grid;
+            grid-template-columns: 460px 300px;
+            gap: 40px;
+            align-items: flex-start;
+        }
+
+        /* --- Dashboard Styles --- */
+        .dashboard {
+            width: 460px;
+            background: var(--glass-bg);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border: 1px solid var(--glass-border);
+            border-radius: 20px;
+            padding: 20px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+        }
+
+        .dashboard-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .picker {
+            display: flex;
+            background: rgba(0, 0, 0, 0.2);
+            padding: 2px;
+            border-radius: 8px;
+        }
+
+        .picker-item {
+            padding: 4px 12px;
+            font-size: 12px;
+            cursor: pointer;
+            border-radius: 6px;
+            transition: background 0.2s;
+        }
+
+        .picker-item.active {
+            background: rgba(255, 255, 255, 0.15);
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        }
+
+        .version {
+            font-size: 10px;
+            color: var(--text-secondary);
+        }
+
+        .hero-distance {
+            text-align: center;
+            margin-top: 8px;
+        }
+
+        .hero-value {
+            font-size: 48px;
+            font-weight: 700;
+            font-variant-numeric: tabular-nums;
+        }
+
+        .hero-unit {
+            font-size: 20px;
+            color: var(--text-secondary);
+            margin-left: 4px;
+        }
+
+        .trend-chart {
+            height: 140px;
+            background: rgba(255, 255, 255, 0.03);
+            border-radius: 14px;
+            padding: 12px;
+            position: relative;
+            display: flex;
+            align-items: flex-end;
+            gap: 4px;
+        }
+
+        .chart-bar {
+            flex: 1;
+            background: linear-gradient(to top, var(--accent-blue), rgba(10, 132, 255, 0.1));
+            border-radius: 4px 4px 0 0;
+            transition: transform 0.3s ease, opacity 0.2s;
+            cursor: pointer;
+        }
+
+        .chart-bar:hover {
+            opacity: 0.8;
+            transform: scaleY(1.05);
+        }
+
+        .metrics-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 8px;
+        }
+
+        .metric-card {
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 10px;
+            padding: 12px 8px;
+            text-align: center;
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+            transition: transform 0.2s;
+        }
+
+        .metric-card:hover {
+            transform: translateY(-2px);
+            background: rgba(255, 255, 255, 0.08);
+        }
+
+        .metric-icon {
+            font-size: 14px;
+            color: var(--accent-blue);
+        }
+
+        .metric-value {
+            font-size: 16px;
+            font-weight: 600;
+            font-variant-numeric: tabular-nums;
+        }
+
+        .metric-label {
+            font-size: 10px;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        .consistency {
+            background: rgba(255, 255, 255, 0.03);
+            border-radius: 14px;
+            padding: 12px;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .consistency-header {
+            display: flex;
+            justify-content: space-between;
+            font-size: 12px;
+        }
+
+        .streak-grid {
+            display: flex;
+            gap: 6px;
+        }
+
+        .streak-dot {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            background: rgba(255, 255, 255, 0.1);
+        }
+
+        .streak-dot.active {
+            background: var(--accent-blue);
+            box-shadow: 0 0 8px rgba(10, 132, 255, 0.4);
+        }
+
+        /* --- Overlay Styles --- */
+        .overlay-preview {
+            width: 300px;
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        .overlay {
+            background: rgba(0, 0, 0, 0.4);
+            backdrop-filter: blur(15px);
+            -webkit-backdrop-filter: blur(15px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 12px;
+            padding: 10px 16px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+            cursor: move;
+        }
+
+        .overlay-stat {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        .overlay-value {
+            font-size: 20px;
+            font-weight: 700;
+            font-variant-numeric: tabular-nums;
+        }
+
+        .overlay-label {
+            font-size: 9px;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+        }
+
+        .divider {
+            width: 1px;
+            height: 24px;
+            background: rgba(255, 255, 255, 0.1);
+        }
+
+        .status-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: var(--accent-green);
+            box-shadow: 0 0 6px var(--accent-green);
+        }
+
+        .tooltip {
+            position: absolute;
+            background: rgba(0, 0, 0, 0.8);
+            backdrop-filter: blur(5px);
+            padding: 6px 10px;
+            border-radius: 20px;
+            font-size: 10px;
+            top: -30px;
+            left: 50%;
+            transform: translateX(-50%);
+            white-space: nowrap;
+            opacity: 0;
+            transition: opacity 0.2s;
+            pointer-events: none;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .chart-bar:hover .tooltip {
+            opacity: 1;
+        }
+
+        .controls {
+            margin-top: 40px;
+            display: flex;
+            gap: 12px;
+        }
+
+        button.action {
+            background: var(--accent-blue);
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 8px;
+            font-weight: 600;
+            cursor: pointer;
+            font-family: var(--font-rounded);
+            transition: filter 0.2s;
+        }
+
+        button.action:hover {
+            filter: brightness(1.1);
+        }
+
+        .novice-bypass {
+            margin-top: 20px;
+            font-size: 13px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            color: var(--text-secondary);
+        }
+
+        .toggle {
+            width: 36px;
+            height: 20px;
+            background: rgba(255, 255, 255, 0.2);
+            border-radius: 10px;
+            position: relative;
+            cursor: pointer;
+        }
+
+        .toggle::after {
+            content: "";
+            position: absolute;
+            width: 16px;
+            height: 16px;
+            background: white;
+            border-radius: 50%;
+            top: 2px;
+            left: 2px;
+            transition: left 0.2s;
+        }
+
+        .toggle.active {
+            background: var(--accent-blue);
+        }
+
+        .toggle.active::after {
+            left: 18px;
+        }
+
+    </style>
+</head>
+<body>
+
+    <h1>WalkingPad Desktop Prototype</h1>
+
+    <div class="container">
+        <!-- Main Dashboard -->
+        <div class="dashboard">
+            <div class="dashboard-header">
+                <div class="picker">
+                    <div class="picker-item active">7 Days</div>
+                    <div class="picker-item">30 Days</div>
+                    <div class="picker-item">Monthly</div>
+                </div>
+                <div class="version">v1.2.0</div>
+            </div>
+
+            <div class="hero-distance">
+                <span class="hero-value" id="total-dist">12.4</span>
+                <span class="hero-unit">km</span>
+            </div>
+
+            <div class="trend-chart" id="chart">
+                <!-- Bars generated by JS -->
+            </div>
+
+            <div class="metrics-grid">
+                <div class="metric-card">
+                    <div class="metric-icon">👣</div>
+                    <div class="metric-value">18.2k</div>
+                    <div class="metric-label">Steps</div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-icon">🕒</div>
+                    <div class="metric-value">3h 45m</div>
+                    <div class="metric-label">Time</div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-icon">⚡</div>
+                    <div class="metric-value">3.2</div>
+                    <div class="metric-label">km/h avg</div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-icon">🔄</div>
+                    <div class="metric-value">14</div>
+                    <div class="metric-label">Sessions</div>
+                </div>
+            </div>
+
+            <div class="consistency">
+                <div class="consistency-header">
+                    <span>Consistency Streak</span>
+                    <span style="color: var(--accent-blue)">5 days active</span>
+                </div>
+                <div class="streak-grid">
+                    <div class="streak-dot active"></div>
+                    <div class="streak-dot active"></div>
+                    <div class="streak-dot"></div>
+                    <div class="streak-dot active"></div>
+                    <div class="streak-dot active"></div>
+                    <div class="streak-dot active"></div>
+                    <div class="streak-dot"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Floating Overlay -->
+        <div class="overlay-preview">
+            <div style="font-size: 14px; font-weight: 600; color: var(--text-secondary);">Stats Overlay Preview</div>
+            
+            <div class="overlay">
+                <div class="overlay-stat">
+                    <div class="overlay-value">3.5</div>
+                    <div class="overlay-label">km/h</div>
+                </div>
+                <div class="divider"></div>
+                <div class="overlay-stat">
+                    <div class="overlay-value">1.42</div>
+                    <div class="overlay-label">km</div>
+                </div>
+                <div class="divider"></div>
+                <div class="overlay-stat">
+                    <div class="overlay-value">24:15</div>
+                    <div class="overlay-label">time</div>
+                </div>
+                <div class="status-dot"></div>
+            </div>
+
+            <div class="novice-bypass">
+                <span>Bypass Novice Guide</span>
+                <div class="toggle active" id="bypass-toggle"></div>
+            </div>
+            <div style="font-size: 11px; color: var(--text-secondary); max-width: 200px;">
+                US11: Skip the mandatory speed limit for the first 1km.
+            </div>
+        </div>
+    </div>
+
+    <div class="controls">
+        <button class="action" onclick="randomize()">Randomize Data</button>
+        <button class="action" style="background: rgba(255,255,255,0.1);" onclick="toggleTheme()">Toggle Mode</button>
+    </div>
+
+    <script>
+        const chart = document.getElementById('chart');
+        const data = [4.2, 2.1, 5.5, 3.8, 6.2, 1.5, 4.9];
+        
+        function renderChart() {
+            chart.innerHTML = '';
+            const max = Math.max(...data);
+            data.forEach((val, i) => {
+                const bar = document.createElement('div');
+                bar.className = 'chart-bar';
+                bar.style.height = `${(val / max) * 100}%`;
+                
+                const tooltip = document.createElement('div');
+                tooltip.className = 'tooltip';
+                tooltip.innerText = `Day ${i+1}: ${val} km`;
+                bar.appendChild(tooltip);
+                
+                chart.appendChild(bar);
+            });
+        }
+
+        function randomize() {
+            for(let i=0; i<data.length; i++) {
+                data[i] = (Math.random() * 8).toFixed(1);
+            }
+            renderChart();
+            document.getElementById('total-dist').innerText = data.reduce((a,b) => parseFloat(a)+parseFloat(b), 0).toFixed(1);
+        }
+
+        const bypassToggle = document.getElementById('bypass-toggle');
+        bypassToggle.onclick = () => {
+            bypassToggle.classList.toggle('active');
+        };
+
+        function toggleTheme() {
+            const body = document.body;
+            if(body.style.backgroundImage.includes('radial-gradient')) {
+                body.style.backgroundImage = 'none';
+                body.style.backgroundColor = '#f5f5f7';
+                body.style.color = '#1d1d1f';
+                document.querySelectorAll('.dashboard').forEach(el => {
+                    el.style.background = 'rgba(255, 255, 255, 0.7)';
+                    el.style.borderColor = 'rgba(0,0,0,0.1)';
+                });
+                document.querySelectorAll('.overlay').forEach(el => {
+                    el.style.background = 'rgba(255, 255, 255, 0.8)';
+                    el.style.color = '#1d1d1f';
+                });
+            } else {
+                location.reload();
+            }
+        }
+
+        renderChart();
+    </script>
+</body>
+</html>

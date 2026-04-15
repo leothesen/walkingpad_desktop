@@ -10,13 +10,20 @@ The original app provided basic BLE treadmill control and step tracking. This fo
 - **Strava integration** — post daily walking summaries to Strava via OAuth2
 - **Redesigned stats dashboard** — SwiftUI Charts with distance trends, activity heatmap, and session breakdowns
 - **Session-level tracking** — individual sessions with start/end times, not just daily totals
-- **macOS 26 Liquid Glass UI** — frosted glass effects throughout the menu bar popover
+- **macOS 26 Liquid Glass UI** — frosted glass effects throughout the menu bar popover. See [Design System](docs/DESIGN_SYSTEM.md).
+- **Interactive Prototype** — explore the UI design in [prototype/index.html](prototype/index.html).
 - **Live status bar** — shows current session distance + time while walking, today's total when idle
 - **Speed slider** — replaced the 4x4 button grid with a slider + fine-tune +/- buttons
 - **60-minute notification** — macOS notification + auto speed reduction after 1 hour of continuous walking
 - **Stop & Finish Day** — one-tap button to stop the treadmill and post to Strava with confirmation
 - **Debug panel** — BLE console, raw data viewer, Notion/Strava config, activity log
 - **Removed legacy integrations** — Google Fit/HCGateway, Netlify stats app, OAuth2 framework dependency
+
+## 🚀 Key User Stories
+We focus on an unobtrusive, high-performance experience for power users.
+- **US02: Stats Overlay** — Semi-transparent, floating metrics window for focus.
+- **US11: Bypass Novice Guide** — Skip mandatory device tutorials for immediate full-speed access.
+See [User Stories](docs/USER_STORIES.md) for the full roadmap.
 
 ## Features
 
