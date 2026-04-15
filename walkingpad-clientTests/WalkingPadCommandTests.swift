@@ -57,4 +57,13 @@ final class WalkingPadCommandTests: XCTestCase {
         let result = WalkingPadCommand.fixChecksum(values: input)
         XCTAssertEqual(result, expected, "Set Manual Mode command sequence should match with correct checksum")
     }
+
+    func testStandbyCommand() {
+        // [0xF7, 0xA2, 2, 2, 166, 0xFD] -> checksum: 162 + 2 + 2 = 166
+        let input: [UInt8] = [247, 162, 2, 2, 0xff, 253]
+        let expected: [UInt8] = [247, 162, 2, 2, 166, 253]
+        
+        let result = WalkingPadCommand.fixChecksum(values: input)
+        XCTAssertEqual(result, expected, "Standby command sequence should match with correct checksum")
+    }
 }

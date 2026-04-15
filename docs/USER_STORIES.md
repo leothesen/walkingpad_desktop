@@ -14,8 +14,14 @@ As a user, I want a floating, semi-transparent overlay showing my speed, distanc
 
 **US03: Global Hotkeys**
 As a power user, I want to change the treadmill speed using keyboard shortcuts (e.g., Cmd + Opt + Up/Down) from any application so that I don't have to interrupt my flow.
-- *Status:* Planned
+- *Status:* Implemented
 - *Priority:* High
+- *Note:*
+    - `Cmd + Opt + ↑/↓`: Fine speed control (0.1 km/h increments)
+    - `Cmd + Opt + Shift + ↑/↓`: Coarse speed control (0.5 km/h increments)
+    - `Cmd + Opt + Space`: Start/Stop Toggle
+    - `Cmd + Opt + S`: Stats Overlay Toggle
+    - `Cmd + Opt + R`: Reset Workout Data
 
 ## Epic 2: Insightful Analytics
 
