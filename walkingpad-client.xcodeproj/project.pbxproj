@@ -50,6 +50,11 @@
 		E100000200000000000000AA /* GlobalHotkeyService.swift in Sources */ = {isa = PBXBuildFile; fileRef = E100000100000000000000AA /* GlobalHotkeyService.swift */; };
 		E100000400000000000000AA /* StatsOverlayController.swift in Sources */ = {isa = PBXBuildFile; fileRef = E100000300000000000000AA /* StatsOverlayController.swift */; };
 		E100000600000000000000AA /* StatsOverlayView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E100000500000000000000AA /* StatsOverlayView.swift */; };
+		BF0000010000000000000001 /* WalkingPadCommandTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = T00000010000000000000001 /* WalkingPadCommandTests.swift */; };
+		BF0000010000000000000002 /* WalkingPadServiceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = T00000010000000000000002 /* WalkingPadServiceTests.swift */; };
+		BF0000010000000000000003 /* ActivityLogTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = T00000010000000000000003 /* ActivityLogTests.swift */; };
+		BF0000010000000000000004 /* DeviceStateTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = T00000010000000000000004 /* DeviceStateTests.swift */; };
+		BF0000010000000000000005 /* WorkoutTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = T00000010000000000000005 /* WorkoutTests.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -102,6 +107,8 @@
 		T00000010000000000000002 /* WalkingPadServiceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WalkingPadServiceTests.swift; sourceTree = "<group>"; };
 		T00000010000000000000003 /* ActivityLogTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ActivityLogTests.swift; sourceTree = "<group>"; };
 		T00000010000000000000004 /* DeviceStateTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeviceStateTests.swift; sourceTree = "<group>"; };
+		T00000010000000000000005 /* WorkoutTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkoutTests.swift; sourceTree = "<group>"; };
+		T000000A0000000000000001 /* walkingpad-clientTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = "walkingpad-clientTests.xctest"; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -116,6 +123,13 @@
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 		J100004100000000000000CC /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		T00000070000000000000001 /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -138,6 +152,7 @@
 		5B2C72D6263468B800CE4F88 /* Products */ = {
 			isa = PBXGroup;
 			children = (
+				T000000A0000000000000001 /* walkingpad-clientTests.xctest */,
 				5B2C72D5263468B800CE4F88 /* Walkingpad Client.app */,
 				J100000700000000000000AA /* WalkingPadWidget.appex */,
 			);
@@ -272,6 +287,7 @@
 				T00000010000000000000002 /* WalkingPadServiceTests.swift */,
 				T00000010000000000000003 /* ActivityLogTests.swift */,
 				T00000010000000000000004 /* DeviceStateTests.swift */,
+				T00000010000000000000005 /* WorkoutTests.swift */,
 			);
 			path = "walkingpad-clientTests";
 			sourceTree = "<group>";
@@ -320,6 +336,23 @@
 			productReference = J100000700000000000000AA /* WalkingPadWidget.appex */;
 			productType = "com.apple.product-type.app-extension";
 		};
+		T00000030000000000000001 /* walkingpad-clientTests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = T00000040000000000000001 /* Build configuration list for PBXNativeTarget "walkingpad-clientTests" */;
+			buildPhases = (
+				T00000060000000000000001 /* Sources */,
+				T00000070000000000000001 /* Frameworks */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				T00000080000000000000001 /* PBXTargetDependency */,
+			);
+			name = "walkingpad-clientTests";
+			productName = "walkingpad-clientTests";
+			productReference = T000000A0000000000000001 /* walkingpad-clientTests.xctest */;
+			productType = "com.apple.product-type.bundle.unit-test";
+		};
 /* End PBXNativeTarget section */
 
 /* Begin PBXProject section */
@@ -332,6 +365,10 @@
 				TargetAttributes = {
 					5B2C72D4263468B800CE4F88 = {
 						CreatedOnToolsVersion = 16.3;
+					T00000030000000000000001 = {
+						CreatedOnToolsVersion = 16.3;
+						TestTargetID = 5B2C72D4263468B800CE4F88;
+					};
 					};
 					J100005000000000000000CC = {
 						CreatedOnToolsVersion = 16.3;
@@ -356,6 +393,7 @@
 			projectDirPath = "";
 			projectRoot = "";
 			targets = (
+				T00000030000000000000001 /* walkingpad-clientTests */,
 				5B2C72D4263468B800CE4F88 /* walkingpad-client */,
 				J100005000000000000000CC /* WalkingPadWidget */,
 			);
@@ -433,6 +471,18 @@ C300000200000000000000CC /* DebugView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		T00000060000000000000001 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				BF0000010000000000000001 /* WalkingPadCommandTests.swift in Sources */,
+				BF0000010000000000000002 /* WalkingPadServiceTests.swift in Sources */,
+				BF0000010000000000000003 /* ActivityLogTests.swift in Sources */,
+				BF0000010000000000000004 /* DeviceStateTests.swift in Sources */,
+				BF0000010000000000000005 /* WorkoutTests.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXSourcesBuildPhase section */
 
 /* Begin PBXContainerItemProxy section */
@@ -442,6 +492,13 @@ C300000200000000000000CC /* DebugView.swift in Sources */,
 			proxyType = 1;
 			remoteGlobalIDString = J100005000000000000000CC;
 			remoteInfo = WalkingPadWidget;
+		};
+		T00000090000000000000001 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 5B2C72CD263468B800CE4F88 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 5B2C72D4263468B800CE4F88;
+			remoteInfo = "walkingpad-client";
 		};
 /* End PBXContainerItemProxy section */
 
@@ -464,6 +521,11 @@ C300000200000000000000CC /* DebugView.swift in Sources */,
 			isa = PBXTargetDependency;
 			target = J100005000000000000000CC /* WalkingPadWidget */;
 			targetProxy = J100008100000000000000DD /* PBXContainerItemProxy */;
+		};
+		T00000080000000000000001 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 5B2C72D4263468B800CE4F88 /* walkingpad-client */;
+			targetProxy = T00000090000000000000001 /* PBXContainerItemProxy */;
 		};
 /* End PBXTargetDependency section */
 
@@ -693,6 +755,26 @@ C300000200000000000000CC /* DebugView.swift in Sources */,
 			};
 			name = Release;
 		};
+		T00000050000000000000001 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				PRODUCT_BUNDLE_IDENTIFIER = "klassm.walkingpad-clientTests";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Walkingpad Client.app/Contents/MacOS/Walkingpad Client";
+			};
+			name = Debug;
+		};
+		T00000050000000000000002 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				PRODUCT_BUNDLE_IDENTIFIER = "klassm.walkingpad-clientTests";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Walkingpad Client.app/Contents/MacOS/Walkingpad Client";
+			};
+			name = Release;
+		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
@@ -719,6 +801,15 @@ C300000200000000000000CC /* DebugView.swift in Sources */,
 			buildConfigurations = (
 				J100006000000000000000DD /* Debug */,
 				J100006100000000000000DD /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		T00000040000000000000001 /* Build configuration list for PBXNativeTarget "walkingpad-clientTests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				T00000050000000000000001 /* Debug */,
+				T00000050000000000000002 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;

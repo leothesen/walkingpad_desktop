@@ -10,3 +10,6 @@
 - id: session-detection
   fact: Session boundaries are detected using speed transitions and idle detection (consecutive zero-step updates).
   date: 2026-04-15
+- id: core-controls-reliability
+  fact: Implemented 0.1 km/h speed increments, debouncing (150ms), state-aware start/stop logic, and standby mode detection. Added coarse hotkeys (0.5 km/h).
+  date: 2026-04-15
