@@ -31,4 +31,9 @@ jobs:
             -configuration Release \
             -destination "platform=macOS,arch=arm64" \
             CODE_SIGN_IDENTITY="-" \
-            2>&1 | tail -80
+            2>&1 | grep -E "error:|warning:|BUILD FAILED|build commands failed" || true
+          xcodebuild -scheme walkingpad-client \
+            -configuration Release \
+            -destination "platform=macOS,arch=arm64" \
+            CODE_SIGN_IDENTITY="-" \
+            -quiet
