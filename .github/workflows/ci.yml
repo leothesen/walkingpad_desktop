@@ -31,4 +31,4 @@ jobs:
             -configuration Release \
             -destination "platform=macOS,arch=arm64" \
             CODE_SIGN_IDENTITY="-" \
-            -quiet
+            2>&1 | tail -80
