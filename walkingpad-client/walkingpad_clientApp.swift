@@ -75,7 +75,14 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                         let totalDist = sessions.reduce(0) { $0 + $1.distance }
                         await MainActor.run {
                             self.workout.todayTotalDistance = totalDist
-                            self.workout.updateWidgetData()
+                        }
+                    }
+
+                    // Update widget with full Notion data
+                    if let allSessions = await self.notionService.fetchAllSessions() {
+                        let workouts = NotionService.groupSessionsByDate(allSessions)
+                        await MainActor.run {
+                            self.workout.updateWidgetData(from: workouts)
                         }
                     }
                 }
@@ -185,10 +192,19 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                     }
                 }
                 await self.stravaService.checkYesterdaySync(notionService: self.notionService)
-            }
-            // Update widget data on launch so the widget has fresh data
-            await MainActor.run {
-                self.workout.updateWidgetData()
+
+                // Fetch all sessions from Notion to populate the widget with the last 7 days
+                if let allSessions = await self.notionService.fetchAllSessions() {
+                    let workouts = NotionService.groupSessionsByDate(allSessions)
+                    await MainActor.run {
+                        self.workout.updateWidgetData(from: workouts)
+                    }
+                }
+            } else {
+                // No Notion configured — use local data
+                await MainActor.run {
+                    self.workout.updateWidgetData()
+                }
             }
         }
     }
