@@ -1,6 +1,7 @@
 import SwiftUI
 import UserNotifications
 import Sparkle
+import WidgetKit
 
 /// Main app entry point. Uses a Settings scene with an empty view since this is a
 /// menu-bar-only app (LSUIElement = true in Info.plist hides it from the Dock).
@@ -75,6 +76,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                         let totalDist = sessions.reduce(0) { $0 + $1.distance }
                         await MainActor.run {
                             self.workout.todayTotalDistance = totalDist
+                            self.workout.updateWidgetData()
                         }
                     }
                 }
@@ -184,6 +186,10 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                     }
                 }
                 await self.stravaService.checkYesterdaySync(notionService: self.notionService)
+            }
+            // Update widget data on launch so the widget has fresh data
+            await MainActor.run {
+                self.workout.updateWidgetData()
             }
         }
     }
