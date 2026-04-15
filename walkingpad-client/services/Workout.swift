@@ -326,10 +326,11 @@ class Workout: ObservableObject {
 
     /// Computes the last 7 days of walking data and writes it to the shared App Group
     /// UserDefaults so the widget extension can display it.
-    public func updateWidgetData() {
+    /// - Parameter workouts: Workout data to use. Falls back to local workouts.json if nil.
+    public func updateWidgetData(from workouts: [WorkoutSaveData]? = nil) {
         let calendar = Calendar.current
         let today = calendar.startOfDay(for: Date())
-        let allWorkouts = loadAll()
+        let allWorkouts = workouts ?? loadAll()
         let formatter = DateFormatter()
         formatter.dateFormat = "yyyy-MM-dd"
 
