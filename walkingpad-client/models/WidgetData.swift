@@ -30,8 +30,8 @@ struct WidgetData: Codable {
 
     /// Writes widget data to the shared App Group UserDefaults.
     func write() {
-        guard let defaults = UserDefaults(suiteName: appGroupID),
+        guard let defaults = UserDefaults(suiteName: Self.appGroupID),
               let encoded = try? JSONEncoder().encode(self) else { return }
-        defaults.set(encoded, forKey: userDefaultsKey)
+        defaults.set(encoded, forKey: Self.userDefaultsKey)
     }
 }
