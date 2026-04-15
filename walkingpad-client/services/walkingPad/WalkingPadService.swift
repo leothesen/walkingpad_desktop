@@ -40,8 +40,9 @@ public struct BLELogEntry: Identifiable {
 open class WalkingPadService: NSObject, CBPeripheralDelegate, ObservableObject {
 
     private var connection: WalkingPadConnection?
+    private var commandInstance: WalkingPadCommand?
     @Published
-    private var lastState: DeviceState? = nil
+    public var lastState: DeviceState? = nil
 
     /// Rolling buffer of recent BLE events for the debug console (max 200).
     @Published
@@ -64,11 +65,16 @@ open class WalkingPadService: NSObject, CBPeripheralDelegate, ObservableObject {
     /// Subscribes to FE01 notifications to start receiving status updates.
     public func onConnect(_ connection: WalkingPadConnection) {
         self.connection = connection
+        self.commandInstance = WalkingPadCommand(connection)
         self.connection?.peripheral.delegate = self
         connection.peripheral.setNotifyValue(true, for: connection.notifyCharacteristic)
         let name = connection.peripheral.name ?? "unknown"
         appLog("Initialized walking pad connection to \(name)")
         log("Connected to \(name)")
+        
+        // Automatically bypass the novice guide speed limit to ensure
+        // power users can walk at their desired speed immediately.
+        self.command()?.bypassNoviceGuide()
     }
 
     /// Called on BLE disconnect. Fires a zero-speed callback to trigger upload/save
@@ -79,6 +85,7 @@ open class WalkingPadService: NSObject, CBPeripheralDelegate, ObservableObject {
         self.notifyZeroSpeed()
         DispatchQueue.main.async {
             self.lastState = nil
+            self.commandInstance = nil
         }
     }
 
@@ -109,8 +116,7 @@ open class WalkingPadService: NSObject, CBPeripheralDelegate, ObservableObject {
 
     /// Returns a command object for writing to the treadmill, or nil if not connected.
     public func command() -> WalkingPadCommand? {
-        guard let connection = self.connection else { return nil }
-        return WalkingPadCommand(connection)
+        return self.commandInstance
     }
 
     /// Decodes a big-endian multi-byte integer from an array of UInt8 values.
@@ -153,13 +159,27 @@ open class WalkingPadService: NSObject, CBPeripheralDelegate, ObservableObject {
             }
 
             let speed = byteArray[3]
-            let isManualMode = byteArray[4] == 1
+            let modeByte = byteArray[4]
+            let mode: WalkingMode
+            if modeByte == 1 {
+                mode = .manual
+            } else if modeByte == 2 {
+                mode = .standby
+            } else {
+                mode = .automatic
+            }
             let distance = sumFrom(Array(byteArray[8...10])) * 10
             let steps = sumFrom(Array(byteArray[11...13]))
             let walkingTimeSeconds = sumFrom(Array(byteArray[5...7]))
 
             let type = statusType == .currentStatus ? "curr" : "last"
-            log("\(type) spd=\(speed) steps=\(steps) dist=\(distance) time=\(walkingTimeSeconds)s mode=\(isManualMode ? "M" : "A")")
+            let modeStr: String
+            switch mode {
+            case .manual: modeStr = "M"
+            case .automatic: modeStr = "A"
+            case .standby: modeStr = "S"
+            }
+            log("\(type) spd=\(speed) steps=\(steps) dist=\(distance) time=\(walkingTimeSeconds)s mode=\(modeStr)")
 
             let status = DeviceState(
                 time: Date(),
@@ -167,7 +187,7 @@ open class WalkingPadService: NSObject, CBPeripheralDelegate, ObservableObject {
                 speed: Int(speed),
                 steps: Int(steps),
                 distance: Int(distance),
-                walkingMode: isManualMode ? WalkingMode.manual : WalkingMode.automatic,
+                walkingMode: mode,
                 deviceName: connection.peripheral.name ?? "unknown",
                 statusType: statusType
             )

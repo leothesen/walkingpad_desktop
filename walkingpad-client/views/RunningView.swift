@@ -5,6 +5,7 @@ import CoreBluetooth
 struct RunningView: View {
     @EnvironmentObject var walkingPadService: WalkingPadService
     @EnvironmentObject var workout: Workout
+    @ObservedObject var overlayController = StatsOverlayController.shared
 
     @State private var sliderSpeed: Double = 0
     @State private var isDragging: Bool = false
@@ -36,7 +37,7 @@ struct RunningView: View {
                     .buttonStyle(.plain)
                     .background(.ultraThinMaterial, in: .circle)
 
-                    Slider(value: $sliderSpeed, in: 0.5...8.0, step: 0.5) {
+                    Slider(value: $sliderSpeed, in: 0.5...8.0, step: 0.1) {
                         SwiftUI.EmptyView()
                     } onEditingChanged: { editing in
                         isDragging = editing
@@ -66,6 +67,16 @@ struct RunningView: View {
                     modeButton(.manual, current: state?.walkingMode)
                     modeButton(.automatic, current: state?.walkingMode)
                 }
+
+                Button(action: { overlayController.toggle(workout: workout, walkingPadService: walkingPadService) }) {
+                    Image(systemName: "pip.fill")
+                        .font(.caption2.weight(.medium))
+                        .frame(width: 24, height: 24)
+                        .contentShape(Capsule())
+                }
+                .buttonStyle(.plain)
+                .background(overlayController.isVisible ? AnyShapeStyle(Color.accentColor) : AnyShapeStyle(.ultraThinMaterial), in: .capsule)
+                .help("Toggle Stats Overlay")
             }
 
             if workout.isStopping || workout.idleProgress > 0 || workout.sessionSaveState != .none {
@@ -141,7 +152,7 @@ struct RunningView: View {
                 Button(action: {
                     stoppingStartTime = Date()
                     workout.isStopping = true
-                    walkingPadService.command()?.setSpeed(speed: 0)
+                    walkingPadService.command()?.stop()
                 }) {
                     Text("Stop")
                         .font(.caption.weight(.semibold))
@@ -210,7 +221,7 @@ struct RunningView: View {
     private func stopAndFinishDay() {
         stoppingStartTime = Date()
         workout.isStopping = true
-        walkingPadService.command()?.setSpeed(speed: 0)
+        walkingPadService.command()?.stop()
 
         let notion = NotionService.shared
         let strava = StravaService.shared
