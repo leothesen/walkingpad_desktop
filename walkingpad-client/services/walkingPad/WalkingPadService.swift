@@ -86,6 +86,7 @@ open class WalkingPadService: NSObject, CBPeripheralDelegate, ObservableObject {
         DispatchQueue.main.async {
             self.lastState = nil
             self.commandInstance = nil
+            self.connection = nil
         }
     }
 

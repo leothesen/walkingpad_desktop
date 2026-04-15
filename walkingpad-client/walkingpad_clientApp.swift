@@ -47,7 +47,6 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         super.init()
 
         // Polling timer: requests a status update from the treadmill and checks for date rollover.
-        // Note: the interval parameter is currently ignored by RepeatingTimer (hardcodes 4s).
         self.updateTimer = RepeatingTimer(interval: 5, eventHandler: {
             self.workout.resetIfDateChanged()
             self.stravaService.resetIfDateChanged()
@@ -105,6 +104,78 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         self.mqttService.start()
         self.updateTimer?.start();
         self.bluetoothDiscoverService.start()
+        
+        // Setup global hotkeys for speed control (Cmd + Opt + Up/Down)
+        GlobalHotkeyService.shared.setup(
+            onUp: { [weak self] in
+                guard let self = self, let state = self.walkingPadService.lastStatus() else { return }
+                if state.speed == 0 {
+                    appLog("Hotkey: Speed Up (Starting from 0)")
+                    self.walkingPadService.command()?.wakeAndStart(currentState: state)
+                } else {
+                    let newSpeed = min(UInt8(state.speed) + 1, 80)
+                    appLog("Hotkey: Speed Up to \(Double(newSpeed)/10.0)")
+                    self.walkingPadService.command()?.setSpeed(speed: newSpeed)
+                }
+            },
+            onDown: { [weak self] in
+                guard let self = self, let state = self.walkingPadService.lastStatus() else { return }
+                let newSpeed = state.speed > 1 ? UInt8(state.speed) - 1 : 0
+                appLog("Hotkey: Speed Down to \(Double(newSpeed)/10.0)")
+                if newSpeed == 0 && state.speed > 0 {
+                    self.walkingPadService.command()?.stop()
+                } else if newSpeed > 0 {
+                    self.walkingPadService.command()?.setSpeed(speed: newSpeed)
+                }
+            },
+            onUpCoarse: { [weak self] in
+                guard let self = self, let state = self.walkingPadService.lastStatus() else { return }
+                if state.speed == 0 {
+                    appLog("Hotkey Coarse: Speed Up (Starting from 0)")
+                    self.walkingPadService.command()?.wakeAndStart(currentState: state)
+                } else {
+                    let newSpeed = min(UInt8(state.speed) + 5, 80)
+                    appLog("Hotkey Coarse: Speed Up to \(Double(newSpeed)/10.0)")
+                    self.walkingPadService.command()?.setSpeed(speed: newSpeed)
+                }
+            },
+            onDownCoarse: { [weak self] in
+                guard let self = self, let state = self.walkingPadService.lastStatus() else { return }
+                let newSpeed = state.speed > 5 ? UInt8(state.speed) - 5 : (state.speed > 0 ? 0 : 0)
+                appLog("Hotkey Coarse: Speed Down to \(Double(newSpeed)/10.0)")
+                if newSpeed == 0 && state.speed > 0 {
+                    self.walkingPadService.command()?.stop()
+                } else if newSpeed > 0 {
+                    self.walkingPadService.command()?.setSpeed(speed: newSpeed)
+                }
+            },
+            onToggle: { [weak self] in
+                guard let self = self, let state = self.walkingPadService.lastStatus() else { return }
+                if state.speed == 0 {
+                    appLog("Hotkey: Toggle Start")
+                    self.walkingPadService.command()?.wakeAndStart(currentState: state)
+                } else {
+                    appLog("Hotkey: Toggle Stop")
+                    self.walkingPadService.command()?.stop()
+                }
+            },
+            onReset: { [weak self] in
+                guard let self = self else { return }
+                appLog("Hotkey: Reset Workout Data")
+                self.workout.steps = 0
+                self.workout.distance = 0
+                self.workout.walkingSeconds = 0
+                self.workout.todayTotalDistance = 0
+                self.workout.todaySessions = []
+                self.workout.save()
+            },
+            onStats: { [weak self] in
+                guard let self = self else { return }
+                appLog("Hotkey: Toggle Stats Overlay")
+                StatsOverlayController.shared.toggle(workout: self.workout, walkingPadService: self.walkingPadService)
+            }
+        )
+
         NSWorkspace.shared.notificationCenter.addObserver(self, selector: #selector(receiveSleepNotification), name: NSWorkspace.willSleepNotification, object: nil)
         NSWorkspace.shared.notificationCenter.addObserver(self, selector: #selector(receiveWakeNotification), name: NSWorkspace.didWakeNotification, object: nil)
     }
@@ -114,11 +185,10 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         appLog("Received sleep notification, stopping timer");
         self.updateTimer?.stop();
         self.mqttService.stop()
+        self.bluetoothDiscoverService.stop()
     }
 
     /// Restarts all services after waking from sleep.
-    /// Attempts to reconnect to the previously-known BLE peripheral after a 2-second delay
-    /// to give CoreBluetooth time to reinitialize.
     @objc func receiveWakeNotification(sender: AnyObject) {
         appLog("Received wake notification, reinitializing services");
 
@@ -128,10 +198,6 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         self.bluetoothDiscoverService.start()
         self.mqttService.start()
         self.updateTimer?.start()
-
-        DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) { [weak self] in
-            self?.bluetoothDiscoverService.reconnectToKnownPeripheral()
-        }
 
         self.workout.resetIfDateChanged()
         self.stravaService.resetIfDateChanged()

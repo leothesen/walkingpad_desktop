@@ -47,6 +47,9 @@
 		E500000400000000000000EE /* StravaOAuthServer.swift in Sources */ = {isa = PBXBuildFile; fileRef = E500000300000000000000EE /* StravaOAuthServer.swift */; };
 		F600000200000000000000FF /* ActivityLog.swift in Sources */ = {isa = PBXBuildFile; fileRef = F600000100000000000000FF /* ActivityLog.swift */; };
 		G700000200000000000000GG /* ActivityLogTabView.swift in Sources */ = {isa = PBXBuildFile; fileRef = G700000100000000000000GG /* ActivityLogTabView.swift */; };
+		E100000200000000000000AA /* GlobalHotkeyService.swift in Sources */ = {isa = PBXBuildFile; fileRef = E100000100000000000000AA /* GlobalHotkeyService.swift */; };
+		E100000400000000000000AA /* StatsOverlayController.swift in Sources */ = {isa = PBXBuildFile; fileRef = E100000300000000000000AA /* StatsOverlayController.swift */; };
+		E100000600000000000000AA /* StatsOverlayView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E100000500000000000000AA /* StatsOverlayView.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -92,6 +95,9 @@
 		J100000500000000000000BB /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		J100000600000000000000BB /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		J100000700000000000000AA /* WalkingPadWidget.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = WalkingPadWidget.appex; sourceTree = BUILT_PRODUCTS_DIR; };
+		E100000100000000000000AA /* GlobalHotkeyService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GlobalHotkeyService.swift; sourceTree = "<group>"; };
+		E100000300000000000000AA /* StatsOverlayController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StatsOverlayController.swift; sourceTree = "<group>"; };
+		E100000500000000000000AA /* StatsOverlayView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StatsOverlayView.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -179,6 +185,7 @@
 				5BA1724E263ECF720010E483 /* RunningView.swift */,
 				5BA17250263ED5670010E483 /* StoppedOrPauseView.swift */,
 				5B645D6E2660DF32003B03D7 /* WorkoutStateView.swift */,
+				E100000500000000000000AA /* StatsOverlayView.swift */,
 			);
 			path = views;
 			sourceTree = "<group>";
@@ -207,6 +214,8 @@
 				F600000100000000000000FF /* ActivityLog.swift */,
 				5B43D84D267F761700A16916 /* RepeatingTimer.swift */,
 				5BA17252263EDB0F0010E483 /* Workout.swift */,
+				E100000100000000000000AA /* GlobalHotkeyService.swift */,
+				E100000300000000000000AA /* StatsOverlayController.swift */,
 			);
 			path = services;
 			sourceTree = "<group>";
@@ -381,6 +390,9 @@
 				5BA1724F263ECF720010E483 /* RunningView.swift in Sources */,
 				5B43D84E267F761700A16916 /* RepeatingTimer.swift in Sources */,
 				5B15903D2641BEEC0039C334 /* HttpApi.swift in Sources */,
+				E100000200000000000000AA /* GlobalHotkeyService.swift in Sources */,
+				E100000400000000000000AA /* StatsOverlayController.swift in Sources */,
+				E100000600000000000000AA /* StatsOverlayView.swift in Sources */,
 			B200000200000000000000BB /* StatsViewModel.swift in Sources */,
 			B200000400000000000000BB /* StatsWindowView.swift in Sources */,
 			B200000600000000000000BB /* DailyDistanceChart.swift in Sources */,

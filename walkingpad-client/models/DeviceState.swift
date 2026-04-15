@@ -3,7 +3,7 @@ import Foundation
 /// Treadmill walking mode: manual allows direct speed control,
 /// automatic uses the treadmill's built-in speed program.
 public enum WalkingMode {
-    case manual, automatic
+    case manual, automatic, standby
 }
 
 /// Distinguishes between real-time status updates and last-session summaries

@@ -34,7 +34,7 @@ struct StoppedOrPausedView: View {
                 Button(action: {
                     isStarting = true
                     startingTime = Date()
-                    walkingPadService.command()?.wakeAndStart()
+                    walkingPadService.command()?.wakeAndStart(currentState: walkingPadService.lastStatus())
                 }) {
                     Text("Start")
                         .font(.caption.weight(.semibold))
@@ -45,6 +45,18 @@ struct StoppedOrPausedView: View {
                 .buttonStyle(.plain)
                 .padding(.vertical, 4)
                 .background(.green.opacity(0.1), in: .capsule)
+                
+                Button(action: {
+                    walkingPadService.command()?.bypassNoviceGuide()
+                    appLog("Bypassed novice guide")
+                }) {
+                    Text("Bypass Novice Guide")
+                        .font(.system(size: 9, weight: .medium))
+                        .foregroundStyle(.secondary)
+                        .padding(.vertical, 2)
+                        .frame(maxWidth: .infinity)
+                }
+                .buttonStyle(.plain)
             }
 
             if showYesterdaySync && !isStarting {

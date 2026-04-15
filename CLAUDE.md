@@ -81,10 +81,6 @@ Strava post  → NotionService.fetchTodaySessions() → StravaService → Strava
 
 ## Known Gotchas
 
-- `RepeatingTimer` ignores its `interval` parameter and hardcodes 4 seconds
-- `EmptyView.swift` shadows SwiftUI's built-in `EmptyView`
-- `exit(0)` in FooterView bypasses cleanup
-- Date rollover check only compares day-of-month, not full date
 - `NSApp.delegate as? AppDelegate` cast fails from SwiftUI views — use cached standalone service instances
 - The WalkingPad doesn't report speed=0 when belt stops — session end uses idle detection instead
 - `NSHostingView` in `NSWindow` crashes with infinite constraint loops if SwiftUI content changes size during animations — avoid `.transition()` and broad `.animation()` modifiers in the stats window; use `.frame(minHeight:)` to stabilize layout

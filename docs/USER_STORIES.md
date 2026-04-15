@@ -60,6 +60,6 @@ As a smart home enthusiast, I want my treadmill state to be published to MQTT so
 
 **US11: Bypass Novice Guide**
 As a power user or returning user, I want to skip the mandatory "novice" speed limit tutorial (often 1-3km limit for first 1km) so that I can walk at my desired speed immediately on a new device.
-- *Status:* Planned
+- *Status:* Implemented (Automatic on connection + manual override)
 - *Priority:* High
 - *Note:* This was highlighted by the CEO as a key game-changer for friction removal.
