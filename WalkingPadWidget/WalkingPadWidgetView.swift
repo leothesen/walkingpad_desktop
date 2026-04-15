@@ -58,11 +58,9 @@ struct WalkingPadWidgetView: View {
 
     private var distanceRing: some View {
         ZStack {
-            // Background ring
             Circle()
                 .stroke(Color.white.opacity(0.2), lineWidth: 8)
 
-            // Foreground ring (decorative progress — fills based on 50km weekly goal)
             Circle()
                 .trim(from: 0, to: min(totalKm / 50.0, 1.0))
                 .stroke(
@@ -71,14 +69,12 @@ struct WalkingPadWidgetView: View {
                 )
                 .rotationEffect(.degrees(-90))
 
-            // Walking icon at top
             VStack(spacing: 0) {
                 Image(systemName: "figure.walk")
                     .font(.system(size: 12, weight: .semibold))
                     .foregroundStyle(.white.opacity(0.7))
                     .offset(y: -2)
 
-                // Distance value
                 Text(distanceText)
                     .font(.system(size: 28, weight: .bold, design: .rounded).monospacedDigit())
                     .foregroundStyle(.white)
@@ -96,57 +92,59 @@ struct WalkingPadWidgetView: View {
 
     private func weeklyBarChart(_ distances: [DailyDistance]) -> some View {
         let maxDistance = distances.map(\.distance).max() ?? 1
-        let calendar = Calendar.current
-        let daySymbols = calendar.veryShortWeekdaySymbols
-        // veryShortWeekdaySymbols starts on Sunday (index 0), reorder to start on Monday
-        let mondayFirst = Array(daySymbols[1...]) + [daySymbols[0]]
 
         return VStack(spacing: 4) {
-            // Bars
             GeometryReader { geo in
                 HStack(alignment: .bottom, spacing: 4) {
-                    ForEach(Array(distances.enumerated()), id: \.offset) { _, day in
-                        let barHeight = maxDistance > 0
-                            ? max(CGFloat(day.distance) / CGFloat(maxDistance) * geo.size.height, day.distance > 0 ? 4 : 0)
-                            : 0
-
-                        VStack {
-                            Spacer(minLength: 0)
-                            if day.distance > 0 {
-                                RoundedRectangle(cornerRadius: 3)
-                                    .fill(Color.white.opacity(0.7))
-                                    .frame(height: barHeight)
-                            } else {
-                                // Dashed placeholder for zero-distance days
-                                dashedPlaceholder
-                            }
-                        }
+                    ForEach(0..<distances.count, id: \.self) { index in
+                        barView(
+                            distance: distances[index].distance,
+                            maxDistance: maxDistance,
+                            height: geo.size.height
+                        )
                         .frame(maxWidth: .infinity)
                     }
                 }
             }
             .frame(height: 60)
 
-            // Day labels
-            HStack(spacing: 4) {
-                ForEach(Array(distances.enumerated()), id: \.offset) { _, day in
-                    let dayOfWeek = dayOfWeekIndex(from: day.dateString)
-                    let isToday = isDateToday(day.dateString)
+            dayLabelsRow(distances)
+        }
+    }
 
-                    Text(dayOfWeek != nil ? mondayFirst[dayOfWeek!] : "?")
-                        .font(.system(size: 9, weight: isToday ? .bold : .regular))
-                        .foregroundStyle(.white.opacity(isToday ? 0.9 : 0.5))
-                        .frame(maxWidth: .infinity)
-                }
+    private func barView(distance: Int, maxDistance: Int, height: CGFloat) -> some View {
+        VStack {
+            Spacer(minLength: 0)
+            if distance > 0 {
+                RoundedRectangle(cornerRadius: 3)
+                    .fill(Color.white.opacity(0.7))
+                    .frame(height: max(CGFloat(distance) / CGFloat(maxDistance) * height, 4))
+            } else {
+                Rectangle()
+                    .fill(Color.white.opacity(0.15))
+                    .frame(height: 2)
+                    .padding(.horizontal, 2)
             }
         }
     }
 
-    private var dashedPlaceholder: some View {
-        Rectangle()
-            .fill(Color.white.opacity(0.15))
-            .frame(height: 2)
-            .padding(.horizontal, 2)
+    private func dayLabelsRow(_ distances: [DailyDistance]) -> some View {
+        let calendar = Calendar.current
+        let daySymbols = calendar.veryShortWeekdaySymbols
+        let mondayFirst = Array(daySymbols[1...]) + [daySymbols[0]]
+
+        return HStack(spacing: 4) {
+            ForEach(0..<distances.count, id: \.self) { index in
+                let weekdayIndex = dayOfWeekIndex(from: distances[index].dateString)
+                let today = isDateToday(distances[index].dateString)
+                let label = weekdayIndex != nil ? mondayFirst[weekdayIndex!] : "?"
+
+                Text(label)
+                    .font(.system(size: 9, weight: today ? .bold : .regular))
+                    .foregroundStyle(.white.opacity(today ? 0.9 : 0.5))
+                    .frame(maxWidth: .infinity)
+            }
+        }
     }
 
     // MARK: - Empty State
@@ -168,14 +166,11 @@ struct WalkingPadWidgetView: View {
 
     // MARK: - Helpers
 
-    /// Returns the Monday-based weekday index (0=Monday, 6=Sunday) from a date string.
     private func dayOfWeekIndex(from dateString: String) -> Int? {
         let formatter = DateFormatter()
         formatter.dateFormat = "yyyy-MM-dd"
         guard let date = formatter.date(from: dateString) else { return nil }
         let weekday = Calendar.current.component(.weekday, from: date)
-        // Calendar weekday: 1=Sunday, 2=Monday, ..., 7=Saturday
-        // Convert to Monday-based: Monday=0, Tuesday=1, ..., Sunday=6
         return (weekday + 5) % 7
     }
 

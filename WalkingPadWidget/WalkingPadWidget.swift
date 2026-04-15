@@ -65,9 +65,3 @@ struct WalkingPadWidget: Widget {
         .supportedFamilies([.systemMedium])
     }
 }
-
-#Preview(as: .systemMedium) {
-    WalkingPadWidget()
-} timeline: {
-    WalkingPadEntry(date: Date(), widgetData: WalkingPadWidgetProvider.sampleData())
-}
