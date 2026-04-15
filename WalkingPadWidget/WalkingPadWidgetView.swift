@@ -30,7 +30,7 @@ struct WalkingPadWidgetView: View {
             }
         }
         .containerBackground(for: .widget) {
-            Color(.systemIndigo).opacity(0.85)
+            Color.indigo.opacity(0.85)
         }
     }
 
@@ -105,7 +105,7 @@ struct WalkingPadWidgetView: View {
             // Bars
             GeometryReader { geo in
                 HStack(alignment: .bottom, spacing: 4) {
-                    ForEach(Array(distances.enumerated()), id: \.offset) { index, day in
+                    ForEach(Array(distances.enumerated()), id: \.offset) { _, day in
                         let barHeight = maxDistance > 0
                             ? max(CGFloat(day.distance) / CGFloat(maxDistance) * geo.size.height, day.distance > 0 ? 4 : 0)
                             : 0
@@ -129,7 +129,7 @@ struct WalkingPadWidgetView: View {
 
             // Day labels
             HStack(spacing: 4) {
-                ForEach(Array(distances.enumerated()), id: \.offset) { index, day in
+                ForEach(Array(distances.enumerated()), id: \.offset) { _, day in
                     let dayOfWeek = dayOfWeekIndex(from: day.dateString)
                     let isToday = isDateToday(day.dateString)
 
