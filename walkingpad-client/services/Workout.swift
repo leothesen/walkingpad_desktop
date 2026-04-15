@@ -283,6 +283,8 @@ class Workout: ObservableObject {
         } catch {
             appLog("could not save")
         }
+
+        updateWidgetData()
     }
     
     /// Restores today's workout data from persisted storage on app launch.
@@ -320,5 +322,33 @@ class Workout: ObservableObject {
     
     public func workoutState() -> WorkoutState {
         return WorkoutState(steps: self.steps, distance: self.distance, walkingSeconds: self.walkingSeconds)
+    }
+
+    /// Computes the last 7 days of walking data and writes it to the shared App Group
+    /// UserDefaults so the widget extension can display it.
+    public func updateWidgetData() {
+        let calendar = Calendar.current
+        let today = calendar.startOfDay(for: Date())
+        let allWorkouts = loadAll()
+        let formatter = DateFormatter()
+        formatter.dateFormat = "yyyy-MM-dd"
+
+        var dailyDistances: [DailyDistance] = []
+        for dayOffset in stride(from: 6, through: 0, by: -1) {
+            let date = calendar.date(byAdding: .day, value: -dayOffset, to: today)!
+            let workout = allWorkouts.first { calendar.isDate($0.date, inSameDayAs: date) }
+            dailyDistances.append(DailyDistance(
+                dateString: formatter.string(from: date),
+                distance: workout?.distance ?? 0,
+                steps: workout?.steps ?? 0
+            ))
+        }
+
+        let widgetData = WidgetData(
+            weeklyDistances: dailyDistances,
+            totalDistanceMeters: dailyDistances.reduce(0) { $0 + $1.distance },
+            lastUpdated: Date()
+        )
+        widgetData.write()
     }
 }

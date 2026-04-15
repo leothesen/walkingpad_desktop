@@ -75,6 +75,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                         let totalDist = sessions.reduce(0) { $0 + $1.distance }
                         await MainActor.run {
                             self.workout.todayTotalDistance = totalDist
+                            self.workout.updateWidgetData()
                         }
                     }
                 }
@@ -184,6 +185,10 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                     }
                 }
                 await self.stravaService.checkYesterdaySync(notionService: self.notionService)
+            }
+            // Update widget data on launch so the widget has fresh data
+            await MainActor.run {
+                self.workout.updateWidgetData()
             }
         }
     }

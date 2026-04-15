@@ -13,6 +13,12 @@
 		5B2C72DD263468B900CE4F88 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 5B2C72DC263468B900CE4F88 /* Assets.xcassets */; };
 		5B2C72E0263468B900CE4F88 /* Preview Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 5B2C72DF263468B900CE4F88 /* Preview Assets.xcassets */; };
 		5B2C72ED263469DD00CE4F88 /* DeviceView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5B2C72EC263469DD00CE4F88 /* DeviceView.swift */; };
+		J100001000000000000000AA /* WidgetData.swift in Sources */ = {isa = PBXBuildFile; fileRef = J100000100000000000000AA /* WidgetData.swift */; };
+		J100001100000000000000AA /* WalkingPadWidget.appex in Embed App Extensions */ = {isa = PBXBuildFile; fileRef = J100000700000000000000AA /* WalkingPadWidget.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+		J100002000000000000000BB /* WalkingPadWidget.swift in Sources */ = {isa = PBXBuildFile; fileRef = J100000200000000000000BB /* WalkingPadWidget.swift */; };
+		J100002100000000000000BB /* WalkingPadWidgetView.swift in Sources */ = {isa = PBXBuildFile; fileRef = J100000300000000000000BB /* WalkingPadWidgetView.swift */; };
+		J100002200000000000000BB /* WidgetData.swift in Sources */ = {isa = PBXBuildFile; fileRef = J100000100000000000000AA /* WidgetData.swift */; };
+		J100002300000000000000BB /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = J100000600000000000000BB /* Assets.xcassets */; };
 		5B43D84E267F761700A16916 /* RepeatingTimer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5B43D84D267F761700A16916 /* RepeatingTimer.swift */; };
 		5B44054E282F994400A29A8D /* BluetoothDiscoveryService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5B44054D282F994400A29A8D /* BluetoothDiscoveryService.swift */; };
 		5B440550282FA53F00A29A8D /* WalkingPadService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5B44054F282FA53F00A29A8D /* WalkingPadService.swift */; };
@@ -79,6 +85,13 @@
 		E500000100000000000000EE /* StravaService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StravaService.swift; sourceTree = "<group>"; };
 		E500000300000000000000EE /* StravaOAuthServer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StravaOAuthServer.swift; sourceTree = "<group>"; };
 		F600000100000000000000FF /* ActivityLog.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ActivityLog.swift; sourceTree = "<group>"; };
+		J100000100000000000000AA /* WidgetData.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WidgetData.swift; sourceTree = "<group>"; };
+		J100000200000000000000BB /* WalkingPadWidget.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WalkingPadWidget.swift; sourceTree = "<group>"; };
+		J100000300000000000000BB /* WalkingPadWidgetView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WalkingPadWidgetView.swift; sourceTree = "<group>"; };
+		J100000400000000000000BB /* WalkingPadWidget.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = WalkingPadWidget.entitlements; sourceTree = "<group>"; };
+		J100000500000000000000BB /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
+		J100000600000000000000BB /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		J100000700000000000000AA /* WalkingPadWidget.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = WalkingPadWidget.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -92,6 +105,13 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		J100004100000000000000CC /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
@@ -99,6 +119,7 @@
 			isa = PBXGroup;
 			children = (
 				5B2C72D7263468B800CE4F88 /* walkingpad-client */,
+				J100003000000000000000CC /* WalkingPadWidget */,
 				5B2C72D6263468B800CE4F88 /* Products */,
 			);
 			sourceTree = "<group>";
@@ -107,6 +128,7 @@
 			isa = PBXGroup;
 			children = (
 				5B2C72D5263468B800CE4F88 /* Walkingpad Client.app */,
+				J100000700000000000000AA /* WalkingPadWidget.appex */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -141,6 +163,7 @@
 			children = (
 				5BA1724C263EC1680010E483 /* DeviceState.swift */,
 				5B440554282FD38000A29A8D /* WorkoutsSaveData.swift */,
+				J100000100000000000000AA /* WidgetData.swift */,
 			);
 			path = models;
 			sourceTree = "<group>";
@@ -216,6 +239,18 @@
 			path = stats;
 			sourceTree = "<group>";
 		};
+		J100003000000000000000CC /* WalkingPadWidget */ = {
+			isa = PBXGroup;
+			children = (
+				J100000200000000000000BB /* WalkingPadWidget.swift */,
+				J100000300000000000000BB /* WalkingPadWidgetView.swift */,
+				J100000400000000000000BB /* WalkingPadWidget.entitlements */,
+				J100000500000000000000BB /* Info.plist */,
+				J100000600000000000000BB /* Assets.xcassets */,
+			);
+			path = WalkingPadWidget;
+			sourceTree = "<group>";
+		};
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
@@ -226,10 +261,12 @@
 				5B2C72D1263468B800CE4F88 /* Sources */,
 				5B2C72D2263468B800CE4F88 /* Frameworks */,
 				5B2C72D3263468B800CE4F88 /* Resources */,
+				J100004300000000000000CC /* Embed App Extensions */,
 			);
 			buildRules = (
 			);
 			dependencies = (
+				J100008000000000000000DD /* PBXTargetDependency */,
 			);
 			name = "walkingpad-client";
 			packageProductDependencies = (
@@ -240,6 +277,23 @@
 			productName = "walkingpad-client";
 			productReference = 5B2C72D5263468B800CE4F88 /* Walkingpad Client.app */;
 			productType = "com.apple.product-type.application";
+		};
+		J100005000000000000000CC /* WalkingPadWidget */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = J100007000000000000000DD /* Build configuration list for PBXNativeTarget "WalkingPadWidget" */;
+			buildPhases = (
+				J100004000000000000000CC /* Sources */,
+				J100004100000000000000CC /* Frameworks */,
+				J100004200000000000000CC /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = WalkingPadWidget;
+			productName = WalkingPadWidget;
+			productReference = J100000700000000000000AA /* WalkingPadWidget.appex */;
+			productType = "com.apple.product-type.app-extension";
 		};
 /* End PBXNativeTarget section */
 
@@ -252,6 +306,9 @@
 				LastUpgradeCheck = 1630;
 				TargetAttributes = {
 					5B2C72D4263468B800CE4F88 = {
+						CreatedOnToolsVersion = 16.3;
+					};
+					J100005000000000000000CC = {
 						CreatedOnToolsVersion = 16.3;
 					};
 				};
@@ -275,6 +332,7 @@
 			projectRoot = "";
 			targets = (
 				5B2C72D4263468B800CE4F88 /* walkingpad-client */,
+				J100005000000000000000CC /* WalkingPadWidget */,
 			);
 		};
 /* End PBXProject section */
@@ -286,6 +344,13 @@
 			files = (
 				5B2C72E0263468B900CE4F88 /* Preview Assets.xcassets in Resources */,
 				5B2C72DD263468B900CE4F88 /* Assets.xcassets in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		J100004200000000000000CC /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -326,10 +391,53 @@ C300000200000000000000CC /* DebugView.swift in Sources */,
 			E500000200000000000000EE /* StravaService.swift in Sources */,
 			E500000400000000000000EE /* StravaOAuthServer.swift in Sources */,
 			F600000200000000000000FF /* ActivityLog.swift in Sources */,
+			J100001000000000000000AA /* WidgetData.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		J100004000000000000000CC /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				J100002000000000000000BB /* WalkingPadWidget.swift in Sources */,
+				J100002100000000000000BB /* WalkingPadWidgetView.swift in Sources */,
+				J100002200000000000000BB /* WidgetData.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXSourcesBuildPhase section */
+
+/* Begin PBXContainerItemProxy section */
+		J100008100000000000000DD /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 5B2C72CD263468B800CE4F88 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = J100005000000000000000CC;
+			remoteInfo = WalkingPadWidget;
+		};
+/* End PBXContainerItemProxy section */
+
+/* Begin PBXCopyFilesBuildPhase section */
+		J100004300000000000000CC /* Embed App Extensions */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 13;
+			files = (
+				J100001100000000000000AA /* WalkingPadWidget.appex in Embed App Extensions */,
+			);
+			name = "Embed App Extensions";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXCopyFilesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		J100008000000000000000DD /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = J100005000000000000000CC /* WalkingPadWidget */;
+			targetProxy = J100008100000000000000DD /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
 
 /* Begin XCBuildConfiguration section */
 		5B2C72E3263468B900CE4F88 /* Debug */ = {
@@ -505,6 +613,58 @@ C300000200000000000000CC /* DebugView.swift in Sources */,
 			};
 			name = Release;
 		};
+		J100006000000000000000DD /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ARCHS = arm64;
+				CODE_SIGN_ENTITLEMENTS = WalkingPadWidget/WalkingPadWidget.entitlements;
+				CODE_SIGN_IDENTITY = "-";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = U5QKFXJ7A7;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = WalkingPadWidget/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+					"@executable_path/../../../../Frameworks",
+				);
+				MACOSX_DEPLOYMENT_TARGET = 15.0;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = "klassm.walkingpad-client.WalkingPadWidget";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SKIP_INSTALL = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.0;
+			};
+			name = Debug;
+		};
+		J100006100000000000000DD /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ARCHS = arm64;
+				CODE_SIGN_ENTITLEMENTS = WalkingPadWidget/WalkingPadWidget.entitlements;
+				CODE_SIGN_IDENTITY = "-";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = U5QKFXJ7A7;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = WalkingPadWidget/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+					"@executable_path/../../../../Frameworks",
+				);
+				MACOSX_DEPLOYMENT_TARGET = 15.0;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = "klassm.walkingpad-client.WalkingPadWidget";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SKIP_INSTALL = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.0;
+			};
+			name = Release;
+		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
@@ -522,6 +682,15 @@ C300000200000000000000CC /* DebugView.swift in Sources */,
 			buildConfigurations = (
 				5B2C72E6263468B900CE4F88 /* Debug */,
 				5B2C72E7263468B900CE4F88 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		J100007000000000000000DD /* Build configuration list for PBXNativeTarget "WalkingPadWidget" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				J100006000000000000000DD /* Debug */,
+				J100006100000000000000DD /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
