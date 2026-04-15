@@ -401,6 +401,7 @@ C300000200000000000000CC /* DebugView.swift in Sources */,
 			files = (
 				J100002000000000000000BB /* WalkingPadWidget.swift in Sources */,
 				J100002100000000000000BB /* WalkingPadWidgetView.swift in Sources */,
+				J100002200000000000000BB /* WidgetData.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

@@ -31,8 +31,4 @@ jobs:
             -configuration Release \
             -destination "platform=macOS,arch=arm64" \
             CODE_SIGN_IDENTITY="-" \
-            2>&1 | tee /tmp/build.log | tail -5
-          echo '```' >> $GITHUB_STEP_SUMMARY
-          grep -i "error:" /tmp/build.log >> $GITHUB_STEP_SUMMARY || echo "no error lines found" >> $GITHUB_STEP_SUMMARY
-          echo '```' >> $GITHUB_STEP_SUMMARY
-          grep -q "BUILD SUCCEEDED" /tmp/build.log
+            -quiet

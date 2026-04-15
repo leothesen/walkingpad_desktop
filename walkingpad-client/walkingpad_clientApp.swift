@@ -1,7 +1,6 @@
 import SwiftUI
 import UserNotifications
 import Sparkle
-import WidgetKit
 
 /// Main app entry point. Uses a Settings scene with an empty view since this is a
 /// menu-bar-only app (LSUIElement = true in Info.plist hides it from the Dock).

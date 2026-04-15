@@ -1,7 +1,6 @@
 import SwiftUI
 import Foundation
 import UserNotifications
-import WidgetKit
 
 /// Snapshot of the current workout counters, used for MQTT publishing.
 struct WorkoutState {
@@ -351,6 +350,5 @@ class Workout: ObservableObject {
             lastUpdated: Date()
         )
         widgetData.write()
-        WidgetCenter.shared.reloadTimelines(ofKind: "WalkingPadWidget")
     }
 }
