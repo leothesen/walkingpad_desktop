@@ -31,8 +31,4 @@ jobs:
             -configuration Release \
             -destination "platform=macOS,arch=arm64" \
             CODE_SIGN_IDENTITY="-" \
-            2>&1 | tee /tmp/build.log | tail -20
-          STATUS=${PIPESTATUS[0]}
-          echo "--- ERRORS ---"
-          grep "error:" /tmp/build.log || echo "(none)"
-          exit $STATUS
+            -quiet
