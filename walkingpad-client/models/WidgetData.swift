@@ -7,8 +7,10 @@ struct DailyDistance: Codable {
     let steps: Int
 }
 
-/// Snapshot of weekly walking data shared between the main app and the widget extension
-/// via a JSON file in the Autosave Information directory.
+/// Snapshot of weekly walking data shared between the main app and the widget extension.
+///
+/// The main app (non-sandboxed) writes `widgetData.json` into the widget extension's
+/// sandbox container. The widget (sandboxed) reads from its own container. No App Groups needed.
 struct WidgetData: Codable {
     /// Last 7 days of distances, sorted oldest to newest (index 0 = 6 days ago, index 6 = today).
     let weeklyDistances: [DailyDistance]
@@ -17,25 +19,32 @@ struct WidgetData: Codable {
     let lastUpdated: Date
 
     private static let filename = "widgetData.json"
+    private static let widgetBundleID = "klassm.walkingpad-client.WalkingPadWidget"
 
-    /// Directory used by both the main app and the widget extension.
-    private static var sharedDirectory: URL {
-        let paths = FileManager.default.urls(for: .autosavedInformationDirectory, in: .userDomainMask)
-        let dir = paths[0]
+    /// Path used by the **main app** to write into the widget's sandbox container.
+    /// Works because the main app is non-sandboxed and can write to any path.
+    private static var widgetContainerDirectory: URL {
+        let dir = FileManager.default.homeDirectoryForCurrentUser
+            .appendingPathComponent("Library/Containers/\(widgetBundleID)/Data/Documents")
         try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
         return dir
     }
 
-    /// Reads widget data from the shared JSON file.
+    /// Path used by the **widget** to read from its own sandbox container.
+    private static var sandboxDocumentsDirectory: URL {
+        FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
+    }
+
+    /// Reads widget data from the Documents directory (used by the widget).
     static func read() -> WidgetData? {
-        let url = sharedDirectory.appendingPathComponent(filename)
+        let url = sandboxDocumentsDirectory.appendingPathComponent(filename)
         guard let data = try? Data(contentsOf: url) else { return nil }
         return try? JSONDecoder().decode(WidgetData.self, from: data)
     }
 
-    /// Writes widget data to the shared JSON file.
+    /// Writes widget data into the widget's container (used by the main app).
     func write() {
-        let url = Self.sharedDirectory.appendingPathComponent(Self.filename)
+        let url = Self.widgetContainerDirectory.appendingPathComponent(Self.filename)
         guard let encoded = try? JSONEncoder().encode(self) else { return }
         try? encoded.write(to: url)
     }
