@@ -177,9 +177,6 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             button.image?.isTemplate = true
         }
 
-        // Schedule Strava auto-post at 23:59
-        scheduleStravaAutoPost()
-
         // Fetch today's total from Notion for the status bar on launch,
         // and check if yesterday's sessions need syncing to Strava
         Task {
@@ -211,59 +208,6 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
     @objc func update() {
         self.walkingPadService.command()?.updateStatus()
-    }
-
-    /// Schedules a Strava auto-post at 23:59 local time.
-    private func scheduleStravaAutoPost() {
-        let calendar = Calendar.current
-        var components = calendar.dateComponents([.year, .month, .day], from: Date())
-        components.hour = 23
-        components.minute = 59
-        guard let fireDate = calendar.date(from: components), fireDate > Date() else {
-            appLog("Strava: 23:59 already passed today, skipping auto-post schedule")
-            return
-        }
-
-        let interval = fireDate.timeIntervalSince(Date())
-        appLog("Strava: auto-post scheduled in \(Int(interval / 60)) minutes")
-        DispatchQueue.main.asyncAfter(deadline: .now() + interval) { [weak self] in
-            self?.autoPostToStrava()
-        }
-    }
-
-    private func autoPostToStrava() {
-        guard stravaService.isConnected, !stravaService.isSyncedToday else {
-            appLog("Strava: auto-post skipped (not connected or already synced)")
-            scheduleStravaAutoPostForTomorrow()
-            return
-        }
-
-        Task {
-            if let sessions = await notionService.fetchTodaySessions(), !sessions.isEmpty {
-                let success = await stravaService.postTodayActivity(sessions: sessions, notionService: notionService)
-                appLog("Strava: auto-post \(success ? "succeeded" : "failed")")
-            } else {
-                appLog("Strava: auto-post skipped (no sessions today)")
-            }
-            await MainActor.run {
-                self.scheduleStravaAutoPostForTomorrow()
-            }
-        }
-    }
-
-    private func scheduleStravaAutoPostForTomorrow() {
-        let calendar = Calendar.current
-        guard let tomorrow = calendar.date(byAdding: .day, value: 1, to: Date()) else { return }
-        var components = calendar.dateComponents([.year, .month, .day], from: tomorrow)
-        components.hour = 23
-        components.minute = 59
-        guard let fireDate = calendar.date(from: components) else { return }
-
-        let interval = fireDate.timeIntervalSince(Date())
-        appLog("Strava: next auto-post in \(Int(interval / 3600)) hours")
-        DispatchQueue.main.asyncAfter(deadline: .now() + interval) { [weak self] in
-            self?.autoPostToStrava()
-        }
     }
 
     /// Updates the status bar to show live session stats when walking,

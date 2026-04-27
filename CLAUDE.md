@@ -38,7 +38,7 @@ Strava post  → NotionService.fetchTodaySessions() → StravaService → Strava
 
 | File | Purpose |
 |------|---------|
-| `walkingpad_clientApp.swift` | App entry, service wiring, sleep/wake, auto-post timer |
+| `walkingpad_clientApp.swift` | App entry, service wiring, sleep/wake |
 | `WalkingPadService.swift` | BLE notification parsing, debug log buffer |
 | `WalkingPadCommand.swift` | BLE write commands with checksum |
 | `BluetoothDiscoveryService.swift` | Device scanning, connection, reconnect |
