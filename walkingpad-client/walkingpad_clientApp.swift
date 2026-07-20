@@ -168,7 +168,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         view.sizingOptions = [.intrinsicContentSize]
         let menuItem = NSMenuItem()
         menuItem.view = view
-        view.frame = NSRect(x: 0, y: 0, width: 200, height: 265)
+        view.frame = NSRect(x: 0, y: 0, width: 230, height: 380)
 
         let menu = NSMenu()
         menu.addItem(menuItem)

@@ -172,7 +172,7 @@ struct FooterView: View {
         let hostingView = NSHostingView(rootView: statsView)
 
         let window = NSWindow(
-            contentRect: NSRect(x: 0, y: 0, width: 500, height: 480),
+            contentRect: NSRect(x: 0, y: 0, width: 560, height: 560),
             styleMask: [.titled, .closable, .resizable, .miniaturizable],
             backing: .buffered,
             defer: false
@@ -181,7 +181,7 @@ struct FooterView: View {
         window.title = "WalkingPad Stats"
         window.contentView = hostingView
         window.isReleasedWhenClosed = false
-        window.minSize = NSSize(width: 400, height: 400)
+        window.minSize = NSSize(width: 540, height: 480)
         window.makeKeyAndOrderFront(nil)
         NSApp.activate()
 
