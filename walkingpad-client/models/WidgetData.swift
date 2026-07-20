@@ -46,6 +46,12 @@ struct WidgetData: Codable {
     func write() {
         let url = Self.widgetContainerDirectory.appendingPathComponent(Self.filename)
         guard let encoded = try? JSONEncoder().encode(self) else { return }
-        try? encoded.write(to: url)
+        do {
+            try encoded.write(to: url, options: .atomic)
+        } catch {
+            // Other apps' containers are behind macOS privacy protection — surface
+            // the failure instead of silently leaving the widget stale.
+            appLog("Widget data write failed: \(error.localizedDescription)", type: .error)
+        }
     }
 }

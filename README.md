@@ -92,7 +92,7 @@ Post daily walking summaries to Strava as Walk activities.
 
 For Home Assistant integration, create a config file at:
 ```
-~/Library/Containers/klassm.walkingpad-client/Data/Library/Autosave Information/.walkingpad-client-mqtt.json
+~/Library/Application Support/walkingpad-client/.walkingpad-client-mqtt.json
 ```
 
 ```json

@@ -47,7 +47,6 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         super.init()
 
         // Polling timer: requests a status update from the treadmill and checks for date rollover.
-        // Note: the interval parameter is currently ignored by RepeatingTimer (hardcodes 4s).
         self.updateTimer = RepeatingTimer(interval: 5, eventHandler: {
             self.workout.resetIfDateChanged()
             self.stravaService.resetIfDateChanged()
@@ -97,7 +96,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             // Update status bar after @Published mutations have been dispatched
             DispatchQueue.main.async {
                 DispatchQueue.main.async {
-                    self.updateStatusBarTitle(speed: newState.speed)
+                    self.updateStatusBarTitle()
                 }
             }
         }
@@ -159,10 +158,14 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             startHttpServer(walkingPadService: self.walkingPadService, workout: self.workout)
         }
 
-        // Create the SwiftUI popover hosted inside an NSMenu attached to the status bar icon
+        // Create the SwiftUI popover hosted inside an NSMenu attached to the status bar icon.
+        // Width is fixed by ContentView; intrinsic sizing lets the menu height follow
+        // the content (connected/running/stopped states differ in height) instead of
+        // clipping against a hardcoded frame.
         let view = NSHostingView(rootView: ContentView()
                                     .environmentObject(workout)
                                     .environmentObject(walkingPadService))
+        view.sizingOptions = [.intrinsicContentSize]
         let menuItem = NSMenuItem()
         menuItem.view = view
         view.frame = NSRect(x: 0, y: 0, width: 200, height: 265)
@@ -175,7 +178,18 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         if let button = self.statusBarItem.button {
             button.image = NSImage(named: "StatusIcon")
             button.image?.isTemplate = true
+            button.imagePosition = .imageLeading
+            // Monospaced digits keep the item width stable while the timer ticks
+            button.font = NSFont.monospacedDigitSystemFont(ofSize: NSFont.systemFontSize, weight: .regular)
         }
+
+        // Refresh the title every second while a session is active so the
+        // duration ticks live instead of jumping on each 5s BLE poll.
+        let statusBarTimer = Timer(timeInterval: 1.0, repeats: true) { [weak self] _ in
+            guard let self = self, self.workout.currentSessionStartTime != nil else { return }
+            self.updateStatusBarTitle()
+        }
+        RunLoop.main.add(statusBarTimer, forMode: .common)
 
         // Fetch today's total from Notion for the status bar on launch,
         // and check if yesterday's sessions need syncing to Strava
@@ -185,7 +199,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                     let totalDist = sessions.reduce(0) { $0 + $1.distance }
                     await MainActor.run {
                         self.workout.todayTotalDistance = totalDist
-                        self.updateStatusBarTitle(speed: 0)
+                        self.updateStatusBarTitle()
                     }
                 }
                 await self.stravaService.checkYesterdaySync(notionService: self.notionService)
@@ -212,10 +226,12 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
     /// Updates the status bar to show live session stats when walking,
     /// or today's total distance (from Notion) when idle.
-    private func updateStatusBarTitle(speed: Int) {
+    private func updateStatusBarTitle() {
         guard let button = self.statusBarItem?.button else { return }
 
-        if speed > 0, let sessionStart = workout.currentSessionStartTime {
+        // The icon stays visible in all states so the item doesn't change
+        // shape when a session starts or the menu is opened.
+        if let sessionStart = workout.currentSessionStartTime {
             // Active session: show current session distance + duration
             let dist = workout.sessionDistance
             let elapsed = Int(Date().timeIntervalSince(sessionStart))
@@ -224,20 +240,12 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
             let distStr = dist >= 1000 ? String(format: "%.2f km", Double(dist) / 1000.0) : "\(dist) m"
             button.title = " \(distStr) · \(mins):\(String(format: "%02d", secs))"
-            button.image = nil
         } else {
-            // Idle: show today's total from Notion
-            let totalDist = workout.todayTotalDistance
-            if totalDist > 0 {
-                let distStr = totalDist >= 1000 ? String(format: "%.2f km", Double(totalDist) / 1000.0) : "\(totalDist) m"
-                button.title = " \(distStr)"
-                button.image = NSImage(named: "StatusIcon")
-                button.image?.isTemplate = true
-            } else {
-                button.title = ""
-                button.image = NSImage(named: "StatusIcon")
-                button.image?.isTemplate = true
-            }
+            // Idle: show today's total (Notion total once synced, else local)
+            let totalDist = max(workout.todayTotalDistance, workout.distance)
+            button.title = totalDist > 0
+                ? " " + (totalDist >= 1000 ? String(format: "%.2f km", Double(totalDist) / 1000.0) : "\(totalDist) m")
+                : ""
         }
     }
 }

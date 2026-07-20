@@ -30,7 +30,7 @@ Strava post  → NotionService.fetchTodaySessions() → StravaService → Strava
 - **Entry point**: `walkingpad_clientApp.swift` — `MenuBarPopoverApp` + `AppDelegate`
 - **Services**: All business logic in `services/`
 - **Views**: SwiftUI in `views/`, environment objects for Workout + WalkingPadService
-- **Config storage**: JSON files in `~/Library/Containers/klassm.walkingpad-client/Data/Library/Autosave Information/`
+- **Config storage**: JSON files in `~/Library/Application Support/walkingpad-client/` (legacy `Autosave Information` locations are migrated on first access)
 - **Notion**: Source of truth for sessions and daily totals
 - **Strava**: One-way push of daily Walk activities via OAuth2
 
@@ -59,7 +59,7 @@ Strava post  → NotionService.fetchTodaySessions() → StravaService → Strava
 - Status: 14+ bytes — speed (byte 3), mode (4), time (5-7), distance (8-10), steps (11-13)
 - Session detection: idle-based (2 consecutive zero-step updates, ~8s) since the WalkingPad doesn't reliably report speed=0
 
-## Config Files (in Autosave Information directory)
+## Config Files (in `~/Library/Application Support/walkingpad-client/`)
 
 | File | Purpose |
 |------|---------|
@@ -79,16 +79,13 @@ Strava post  → NotionService.fetchTodaySessions() → StravaService → Strava
 
 ## Known Gotchas
 
-- `RepeatingTimer` ignores its `interval` parameter and hardcodes 4 seconds
-- `EmptyView.swift` shadows SwiftUI's built-in `EmptyView`
-- `exit(0)` in FooterView bypasses cleanup
-- Date rollover check only compares day-of-month, not full date
-- `NSApp.delegate as? AppDelegate` cast fails from SwiftUI views — use cached standalone service instances
+- `NSApp.delegate as? AppDelegate` cast fails from SwiftUI views — use the shared singletons (`NotionService.shared`, `StravaService.shared`) instead
 - The WalkingPad doesn't report speed=0 when belt stops — session end uses idle detection instead
+- `~/Library/Autosave Information` is behind macOS privacy protection (TCC) on recent macOS — non-sandboxed reads/writes fail with EPERM "Operation not permitted". App data lives in `~/Library/Application Support/walkingpad-client/`; `FileSystem` migrates from legacy locations best-effort
 - `NSHostingView` in `NSWindow` crashes with infinite constraint loops if SwiftUI content changes size during animations — avoid `.transition()` and broad `.animation()` modifiers in the stats window; use `.frame(minHeight:)` to stabilize layout
 - GitHub Actions `macos-15` runners only have macOS 15 SDK — no macOS 26 Liquid Glass APIs; all `.glassEffect()` replaced with `.background(.ultraThinMaterial)`
 - Picker binding to `@Published` property causes "Publishing changes from within view updates" — use local `@State` for Picker, sync to view model via `DispatchQueue.main.async` in `.onChange`
 - All logging uses `appLog()` (global function in ActivityLog.swift) which routes to both console and the debug panel's Log tab
-- Session idle detection uses 2 consecutive zero-step updates (~8s at 4s polling); only starts counting after first step to avoid false idle on session start
+- Session idle detection uses 2 consecutive zero-step updates (~10s at 5s polling); only starts counting after first step to avoid false idle on session start
 - Strava API does not support a `steps` field on activity creation — steps only appear in the description text
 - Sparkle EdDSA private key is in GitHub secret `SPARKLE_PRIVATE_KEY`; public key is in Info.plist `SUPublicEDKey`
