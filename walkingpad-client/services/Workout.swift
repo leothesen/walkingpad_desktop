@@ -364,6 +364,10 @@ class Workout: ObservableObject {
             totalDistanceMeters: dailyDistances.reduce(0) { $0 + $1.distance },
             lastUpdated: Date()
         )
-        widgetData.write()
+        if let error = widgetData.write() {
+            // The widget's container is another app's container — macOS privacy
+            // protection can deny the write; surface it instead of going stale silently.
+            appLog("Widget data write failed: \(error.localizedDescription)", type: .error)
+        }
     }
 }

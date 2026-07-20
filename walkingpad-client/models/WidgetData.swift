@@ -43,15 +43,17 @@ struct WidgetData: Codable {
     }
 
     /// Writes widget data into the widget's container (used by the main app).
-    func write() {
+    /// This file is also compiled into the widget target, which has no ActivityLog —
+    /// so the error is returned for the caller to log rather than logged here.
+    @discardableResult
+    func write() -> Error? {
         let url = Self.widgetContainerDirectory.appendingPathComponent(Self.filename)
-        guard let encoded = try? JSONEncoder().encode(self) else { return }
+        guard let encoded = try? JSONEncoder().encode(self) else { return nil }
         do {
             try encoded.write(to: url, options: .atomic)
+            return nil
         } catch {
-            // Other apps' containers are behind macOS privacy protection — surface
-            // the failure instead of silently leaving the widget stale.
-            appLog("Widget data write failed: \(error.localizedDescription)", type: .error)
+            return error
         }
     }
 }
