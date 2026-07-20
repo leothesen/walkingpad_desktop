@@ -4,7 +4,16 @@ import SwiftUI
 enum TimeRange: String, CaseIterable {
     case week = "7 Days"
     case month = "30 Days"
-    case allTime = "Monthly"
+    case monthly = "Monthly"
+    case yearly = "Yearly"
+    case allTime = "All Time"
+}
+
+/// How chart points are bucketed for the selected range.
+enum ChartGranularity {
+    case day    // one bar per day (7 Days, 30 Days)
+    case month  // one bar per month (Monthly, All Time)
+    case year   // one bar per year (Yearly)
 }
 
 /// A single data point for the trend chart and daily breakdowns.
@@ -39,6 +48,14 @@ class StatsViewModel: ObservableObject {
         self.isLoading = false
     }
 
+    var granularity: ChartGranularity {
+        switch selectedRange {
+        case .week, .month: return .day
+        case .monthly, .allTime: return .month
+        case .yearly: return .year
+        }
+    }
+
     // MARK: - Filtering
 
     var filteredWorkouts: [WorkoutSaveData] {
@@ -51,13 +68,19 @@ class StatsViewModel: ObservableObject {
         case .month:
             let cutoff = calendar.date(byAdding: .day, value: -30, to: now)!
             return allWorkouts.filter { $0.date >= cutoff }
-        case .allTime:
+        case .monthly:
+            // Last 12 calendar months including the current one
+            let startOfMonth = calendar.dateInterval(of: .month, for: now)!.start
+            let cutoff = calendar.date(byAdding: .month, value: -11, to: startOfMonth)!
+            return allWorkouts.filter { $0.date >= cutoff }
+        case .yearly, .allTime:
             return allWorkouts
         }
     }
 
-    /// Previous period for trend comparison (e.g., prior 7 days for week view).
-    private var previousPeriodWorkouts: [WorkoutSaveData] {
+    /// Previous period for trend comparison. Nil when there is no meaningful
+    /// "previous" window (Yearly, All Time).
+    private var previousPeriodWorkouts: [WorkoutSaveData]? {
         let now = Date()
         let calendar = Calendar.current
         switch selectedRange {
@@ -69,8 +92,13 @@ class StatsViewModel: ObservableObject {
             let start = calendar.date(byAdding: .day, value: -60, to: now)!
             let end = calendar.date(byAdding: .day, value: -30, to: now)!
             return allWorkouts.filter { $0.date >= start && $0.date < end }
-        case .allTime:
-            return []
+        case .monthly:
+            let startOfMonth = calendar.dateInterval(of: .month, for: now)!.start
+            let end = calendar.date(byAdding: .month, value: -11, to: startOfMonth)!
+            let start = calendar.date(byAdding: .month, value: -12, to: end)!
+            return allWorkouts.filter { $0.date >= start && $0.date < end }
+        case .yearly, .allTime:
+            return nil
         }
     }
 
@@ -95,21 +123,65 @@ class StatsViewModel: ObservableObject {
 
     // MARK: - Trend (vs previous period)
 
-    /// Percentage change in distance vs previous period. Nil for allTime.
+    /// Percentage change in distance vs previous period.
+    /// Nil when there is no previous window or no data to compare against.
     var distanceTrend: Double? {
-        guard selectedRange != .allTime else { return nil }
-        let previous = previousPeriodWorkouts.reduce(0) { $0 + $1.distance }
-        guard previous > 0 else {
-            return totalDistance > 0 ? 100.0 : 0
-        }
+        guard let previousWorkouts = previousPeriodWorkouts else { return nil }
+        let previous = previousWorkouts.reduce(0) { $0 + $1.distance }
+        guard previous > 0 else { return nil }
         return (Double(totalDistance - previous) / Double(previous)) * 100.0
+    }
+
+    /// Label for what the trend is compared against, e.g. "vs previous 7 days".
+    var trendComparisonLabel: String {
+        switch selectedRange {
+        case .week: return "vs previous 7 days"
+        case .month: return "vs previous 30 days"
+        case .monthly: return "vs previous 12 months"
+        case .yearly, .allTime: return ""
+        }
+    }
+
+    // MARK: - Highlights
+
+    /// The single best day in the selected period.
+    var bestDay: WorkoutSaveData? {
+        filteredWorkouts.max { $0.distance < $1.distance }
+    }
+
+    /// Average distance per active day in the selected period, in meters.
+    var averagePerActiveDay: Int {
+        guard activeDays > 0 else { return 0 }
+        return totalDistance / activeDays
+    }
+
+    /// Consecutive active days ending today (or yesterday, if today has no
+    /// activity yet — an in-progress day shouldn't read as a broken streak).
+    /// Computed over all data, independent of the selected range.
+    var currentStreak: Int {
+        let calendar = Calendar.current
+        let activeDaySet = Set(
+            allWorkouts.filter { $0.steps > 0 }.map { calendar.startOfDay(for: $0.date) }
+        )
+        guard !activeDaySet.isEmpty else { return 0 }
+
+        let today = calendar.startOfDay(for: Date())
+        var day = activeDaySet.contains(today)
+            ? today
+            : calendar.date(byAdding: .day, value: -1, to: today)!
+        var streak = 0
+        while activeDaySet.contains(day) {
+            streak += 1
+            day = calendar.date(byAdding: .day, value: -1, to: day)!
+        }
+        return streak
     }
 
     // MARK: - Formatted Strings
 
     var distanceText: String {
         let km = Double(totalDistance) / 1000.0
-        if km >= 10 {
+        if km >= 100 {
             return String(format: "%.0f", km)
         } else if km >= 1 {
             return String(format: "%.1f", km)
@@ -135,39 +207,66 @@ class StatsViewModel: ObservableObject {
         String(format: "%.1f", averageSpeedKmh)
     }
 
+    var dailyAvgText: String {
+        Self.shortDistance(averagePerActiveDay)
+    }
+
+    var bestDayText: String {
+        guard let best = bestDay else { return "—" }
+        return Self.shortDistance(best.distance)
+    }
+
+    var bestDayDateText: String {
+        guard let best = bestDay else { return "Best day" }
+        let formatter = DateFormatter()
+        formatter.dateFormat = "MMM d"
+        return "Best · \(formatter.string(from: best.date))"
+    }
+
+    static func shortDistance(_ meters: Int) -> String {
+        if meters >= 1000 {
+            return String(format: "%.1f km", Double(meters) / 1000.0)
+        }
+        return "\(meters) m"
+    }
+
     // MARK: - Chart Data
 
     var dailyPoints: [DailyPoint] {
-        if selectedRange == .allTime {
-            return monthlyPoints
+        switch granularity {
+        case .day:
+            return filteredWorkouts.map { w in
+                DailyPoint(
+                    date: w.date,
+                    distance: w.distance,
+                    steps: w.steps,
+                    walkingSeconds: w.walkingSeconds,
+                    sessionCount: w.sessions?.count ?? (w.steps > 0 ? 1 : 0)
+                )
+            }.sorted { $0.date < $1.date }
+        case .month:
+            return groupedPoints(by: [.year, .month])
+        case .year:
+            return groupedPoints(by: [.year])
         }
-        return filteredWorkouts.map { w in
-            DailyPoint(
-                date: w.date,
-                distance: w.distance,
-                steps: w.steps,
-                walkingSeconds: w.walkingSeconds,
-                sessionCount: w.sessions?.count ?? (w.steps > 0 ? 1 : 0)
-            )
-        }.sorted { $0.date < $1.date }
     }
 
-    private var monthlyPoints: [DailyPoint] {
+    private func groupedPoints(by components: Set<Calendar.Component>) -> [DailyPoint] {
         let calendar = Calendar.current
         var grouped: [DateComponents: (distance: Int, steps: Int, seconds: Int, sessions: Int)] = [:]
 
         for w in filteredWorkouts {
-            let components = calendar.dateComponents([.year, .month], from: w.date)
-            var existing = grouped[components] ?? (0, 0, 0, 0)
+            let key = calendar.dateComponents(components, from: w.date)
+            var existing = grouped[key] ?? (0, 0, 0, 0)
             existing.distance += w.distance
             existing.steps += w.steps
             existing.seconds += w.walkingSeconds
             existing.sessions += w.sessions?.count ?? (w.steps > 0 ? 1 : 0)
-            grouped[components] = existing
+            grouped[key] = existing
         }
 
-        return grouped.compactMap { (components, data) -> DailyPoint? in
-            guard let date = calendar.date(from: components) else { return nil }
+        return grouped.compactMap { (key, data) -> DailyPoint? in
+            guard let date = calendar.date(from: key) else { return nil }
             return DailyPoint(
                 date: date,
                 distance: data.distance,
@@ -190,9 +289,10 @@ class StatsViewModel: ObservableObject {
         switch selectedRange {
         case .week: return 7
         case .month: return 30
-        case .allTime:
-            guard let first = allWorkouts.first?.date else { return 0 }
-            return max(1, Calendar.current.dateComponents([.day], from: first, to: Date()).day ?? 0)
+        case .monthly: return 365
+        case .yearly, .allTime:
+            guard let first = allWorkouts.map(\.date).min() else { return 0 }
+            return max(1, (Calendar.current.dateComponents([.day], from: first, to: Date()).day ?? 0) + 1)
         }
     }
 }

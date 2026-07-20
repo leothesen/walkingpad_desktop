@@ -96,18 +96,37 @@ struct StatsWindowView: View {
                 }
             }
             .padding(16)
-            .frame(minWidth: 460, minHeight: 400)
+            .frame(minWidth: 540, minHeight: 480)
     }
 
     // MARK: - Hero Distance
 
     private var heroDistance: some View {
-        HStack(alignment: .firstTextBaseline, spacing: 4) {
-            Text(viewModel.distanceText)
-                .font(.system(size: 42, weight: .bold, design: .rounded).monospacedDigit())
-            Text(viewModel.distanceUnit)
-                .font(.title3.weight(.medium))
-                .foregroundStyle(.secondary)
+        VStack(spacing: 2) {
+            HStack(alignment: .firstTextBaseline, spacing: 4) {
+                Text(viewModel.distanceText)
+                    .font(.system(size: 42, weight: .bold, design: .rounded).monospacedDigit())
+                Text(viewModel.distanceUnit)
+                    .font(.title3.weight(.medium))
+                    .foregroundStyle(.secondary)
+            }
+
+            if let trend = viewModel.distanceTrend {
+                let isUp = trend >= 0
+                HStack(spacing: 4) {
+                    Image(systemName: isUp ? "arrow.up.right" : "arrow.down.right")
+                        .font(.system(size: 9, weight: .bold))
+                    Text(String(format: "%+.0f%%", trend))
+                        .fontWeight(.semibold)
+                    Text(viewModel.trendComparisonLabel)
+                        .foregroundStyle(.secondary)
+                }
+                .font(.caption2)
+                .foregroundStyle(isUp ? .green : .red)
+                .padding(.horizontal, 8)
+                .padding(.vertical, 3)
+                .background((isUp ? Color.green : Color.red).opacity(0.1), in: Capsule())
+            }
         }
         .frame(maxWidth: .infinity)
         .padding(.vertical, 2)
@@ -118,7 +137,7 @@ struct StatsWindowView: View {
     private var trendChart: some View {
         DistanceTrendChart(
             points: viewModel.dailyPoints,
-            isMonthly: viewModel.selectedRange == .allTime,
+            granularity: viewModel.granularity,
             hoveredPoint: $viewModel.hoveredPoint,
             hoverFraction: $hoverFraction
         )
@@ -128,7 +147,7 @@ struct StatsWindowView: View {
         .overlay(alignment: .top) {
             if let hovered = viewModel.hoveredPoint {
                 HStack(spacing: 6) {
-                    Text(hovered.date, format: .dateTime.weekday(.abbreviated).month(.abbreviated).day())
+                    hoveredDateText(hovered.date)
                     Text("·").foregroundStyle(.quaternary)
                     Text(String(format: "%.2f km", hovered.distanceKm))
                         .fontWeight(.semibold)
@@ -145,30 +164,62 @@ struct StatsWindowView: View {
         }
     }
 
+    /// Formats the hovered bar's date at the chart's granularity.
+    @ViewBuilder
+    private func hoveredDateText(_ date: Date) -> some View {
+        switch viewModel.granularity {
+        case .day:
+            Text(date, format: .dateTime.weekday(.abbreviated).month(.abbreviated).day())
+        case .month:
+            Text(date, format: .dateTime.month(.wide).year())
+        case .year:
+            Text(date, format: .dateTime.year())
+        }
+    }
+
     // MARK: - Supporting Metrics
 
     private var supportingMetrics: some View {
-        HStack(spacing: 8) {
-            MetricCard(
-                icon: "figure.walk",
-                value: formattedSteps,
-                label: "Steps"
-            )
-            MetricCard(
-                icon: "clock",
-                value: viewModel.timeText,
-                label: "Time"
-            )
-            MetricCard(
-                icon: "speedometer",
-                value: viewModel.avgSpeedText,
-                label: "km/h avg"
-            )
-            MetricCard(
-                icon: "repeat",
-                value: "\(viewModel.totalSessions)",
-                label: "Sessions"
-            )
+        VStack(spacing: 8) {
+            HStack(spacing: 8) {
+                MetricCard(
+                    icon: "figure.walk",
+                    value: formattedSteps,
+                    label: "Steps"
+                )
+                MetricCard(
+                    icon: "clock",
+                    value: viewModel.timeText,
+                    label: "Time"
+                )
+                MetricCard(
+                    icon: "speedometer",
+                    value: viewModel.avgSpeedText,
+                    label: "km/h avg"
+                )
+                MetricCard(
+                    icon: "repeat",
+                    value: "\(viewModel.totalSessions)",
+                    label: "Sessions"
+                )
+            }
+            HStack(spacing: 8) {
+                MetricCard(
+                    icon: "chart.bar",
+                    value: viewModel.dailyAvgText,
+                    label: "Avg / active day"
+                )
+                MetricCard(
+                    icon: "trophy",
+                    value: viewModel.bestDayText,
+                    label: viewModel.bestDayDateText
+                )
+                MetricCard(
+                    icon: "flame",
+                    value: "\(viewModel.currentStreak)",
+                    label: "Day streak"
+                )
+            }
         }
     }
 
