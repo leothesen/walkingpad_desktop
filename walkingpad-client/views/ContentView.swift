@@ -24,7 +24,7 @@ struct ContentView: View {
     }
 
     var body: some View {
-        VStack(spacing: 6) {
+        VStack(spacing: 8) {
             if walkingPadService.isConnected() {
                 DeviceView()
             } else {
@@ -33,12 +33,18 @@ struct ContentView: View {
 
             StravaInfoBox(stravaService: StravaService.shared)
 
+            Spacer(minLength: 0)
+
             Divider().opacity(0.15)
 
             FooterView()
         }
-        .padding(10)
-        .frame(width: 200)
+        .padding(12)
+        .frame(width: 230)
+        // Tall enough for the biggest state (running view with all controls +
+        // Strava box + footer) so nothing ever clips; shorter states pin the
+        // footer to the bottom via the Spacer.
+        .frame(minHeight: 380, alignment: .top)
     }
 }
 
