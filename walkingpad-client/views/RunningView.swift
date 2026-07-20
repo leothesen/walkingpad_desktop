@@ -9,7 +9,6 @@ struct RunningView: View {
     @State private var sliderSpeed: Double = 0
     @State private var isDragging: Bool = false
     @State private var showFinishConfirm: Bool = false
-    @State private var stoppingStartTime: Date?
 
     var body: some View {
         let state = walkingPadService.lastStatus()
@@ -105,25 +104,20 @@ struct RunningView: View {
                     .padding(.vertical, 4)
                     .background(.green.opacity(0.1), in: .capsule)
                 } else {
-                    TimelineView(.periodic(from: .now, by: 0.25)) { timeline in
-                        let elapsed = stoppingStartTime.map { timeline.date.timeIntervalSince($0) } ?? 0
-                        let idle = workout.idleProgress
-                        let progress: Double = {
-                            if idle >= 1 {
-                                // After first idle: fast fill from 1.0→2.0 over ~4s
-                                let sinceFirstIdle = max(elapsed - 10.0, 0)
-                                return 1.0 + min(sinceFirstIdle / 4.1, 1.0)
-                            } else {
-                                // Before first idle: slow fill 0→1.0 over 10s, then wait at 1.0
-                                return min(elapsed / 10.0, 1.0)
-                            }
-                        }()
-
-                        VStack(spacing: 4) {
-                            Text("Stopping")
+                    // Driven by real treadmill state: first the belt has to report
+                    // speed 0 (or stop producing steps), then idle detection confirms
+                    // the session end. No made-up timers.
+                    let beltStopped = (state?.speed ?? 0) == 0
+                    VStack(spacing: 4) {
+                        HStack(spacing: 6) {
+                            ProgressView()
+                                .controlSize(.mini)
+                            Text(beltStopped || workout.idleProgress > 0 ? "Finishing session…" : "Stopping belt…")
                                 .font(.caption2.weight(.medium))
                                 .foregroundStyle(.red)
-                            ProgressView(value: min(progress, 2.0), total: 2)
+                        }
+                        if workout.idleProgress > 0 {
+                            ProgressView(value: Double(workout.idleProgress), total: Double(workout.zeroStepThreshold))
                                 .tint(.red)
                         }
                     }
@@ -131,18 +125,9 @@ struct RunningView: View {
                     .padding(.vertical, 4)
                     .padding(.horizontal, 8)
                     .background(.red.opacity(0.1), in: .capsule)
-                    .onAppear {
-                        if stoppingStartTime == nil {
-                            stoppingStartTime = Date()
-                        }
-                    }
                 }
             } else {
-                Button(action: {
-                    stoppingStartTime = Date()
-                    workout.isStopping = true
-                    walkingPadService.command()?.setSpeed(speed: 0)
-                }) {
+                Button(action: stopTreadmill) {
                     Text("Stop")
                         .font(.caption.weight(.semibold))
                         .foregroundStyle(.red)
@@ -207,10 +192,20 @@ struct RunningView: View {
         }
     }
 
-    private func stopAndFinishDay() {
-        stoppingStartTime = Date()
+    /// Sends the stop command and polls status eagerly so the speed→0 transition
+    /// (which ends the session) is picked up faster than the regular 5s timer.
+    private func stopTreadmill() {
         workout.isStopping = true
         walkingPadService.command()?.setSpeed(speed: 0)
+        for delay in [1.0, 2.5] {
+            DispatchQueue.main.asyncAfter(deadline: .now() + delay) {
+                walkingPadService.command()?.updateStatus()
+            }
+        }
+    }
+
+    private func stopAndFinishDay() {
+        stopTreadmill()
 
         let notion = NotionService.shared
         let strava = StravaService.shared

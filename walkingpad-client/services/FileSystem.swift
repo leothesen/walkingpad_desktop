@@ -1,36 +1,53 @@
 import Foundation
 
-/// Simple file persistence helper that reads/writes to the app's Autosave Information directory.
+/// Simple file persistence helper that reads/writes to the app's data directory.
 ///
 /// Used for storing workout history (workouts.json), Notion/Strava/MQTT config.
-/// On first access, migrates any existing files from the old sandboxed container path.
+///
+/// Storage location history:
+/// 1. `~/Library/Containers/klassm.walkingpad-client/Data/Library/Autosave Information` (sandboxed era)
+/// 2. `~/Library/Autosave Information` (after the sandbox was disabled)
+/// 3. `~/Library/Application Support/walkingpad-client` (current)
+///
+/// Location 2 broke when macOS put `~/Library/Autosave Information` behind privacy
+/// protection — all reads/writes fail with "Operation not permitted". Application
+/// Support is the canonical home for this kind of data and is not protected.
+/// On first access, files found in the legacy locations are migrated best-effort;
+/// the OS may still deny reads from the old paths, which is logged so the user
+/// knows to re-enter config in the debug panel.
 class FileSystem {
-    /// Old sandboxed container path where config files lived before sandbox was disabled.
-    private static let legacyContainerDir = FileManager.default.homeDirectoryForCurrentUser
-        .appendingPathComponent("Library/Containers/klassm.walkingpad-client/Data/Library/Autosave Information")
+    /// Current data directory: ~/Library/Application Support/walkingpad-client
+    static let directory: URL = FileManager.default
+        .urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
+        .appendingPathComponent("walkingpad-client", isDirectory: true)
+
+    /// Old storage locations, newest first.
+    private static let legacyDirectories: [URL] = [
+        FileManager.default.homeDirectoryForCurrentUser
+            .appendingPathComponent("Library/Autosave Information"),
+        FileManager.default.homeDirectoryForCurrentUser
+            .appendingPathComponent("Library/Containers/klassm.walkingpad-client/Data/Library/Autosave Information")
+    ]
 
     private static var hasMigrated = false
 
-    /// Returns the app's Autosave Information directory, creating it if necessary.
+    /// Returns the app's data directory, creating it and running legacy migration if necessary.
     private func getDirectory() -> URL {
-        let paths = FileManager.default.urls(for: .autosavedInformationDirectory, in: .userDomainMask)
-        let path = paths[0]
-        try? FileManager.default.createDirectory(atPath: path.path, withIntermediateDirectories: true)
+        let path = FileSystem.directory
+        try? FileManager.default.createDirectory(at: path, withIntermediateDirectories: true)
 
-        // Migrate legacy config files from the old sandboxed container
         if !FileSystem.hasMigrated {
             FileSystem.hasMigrated = true
-            migrateFromLegacyContainer(to: path)
+            migrateFromLegacyLocations(to: path)
         }
 
         return path
     }
 
-    /// Copies config files from the old sandbox container if they exist and aren't already in the new location.
-    private func migrateFromLegacyContainer(to newDir: URL) {
-        let legacyDir = FileSystem.legacyContainerDir
-        guard FileManager.default.fileExists(atPath: legacyDir.path) else { return }
-
+    /// Copies files from old storage locations if they exist and aren't already in the new one.
+    /// Reads can be denied by macOS privacy protection on the old paths — that is logged
+    /// and skipped rather than treated as fatal.
+    private func migrateFromLegacyLocations(to newDir: URL) {
         let configFiles = [
             ".walkingpad-client-notion.json",
             ".walkingpad-client-strava.json",
@@ -39,15 +56,20 @@ class FileSystem {
         ]
 
         for filename in configFiles {
-            let source = legacyDir.appendingPathComponent(filename)
             let dest = newDir.appendingPathComponent(filename)
-            if FileManager.default.fileExists(atPath: source.path) &&
-               !FileManager.default.fileExists(atPath: dest.path) {
+            guard !FileManager.default.fileExists(atPath: dest.path) else { continue }
+
+            for legacyDir in FileSystem.legacyDirectories {
+                let source = legacyDir.appendingPathComponent(filename)
                 do {
-                    try FileManager.default.copyItem(at: source, to: dest)
-                    appLog("Migrated \(filename) from legacy container")
+                    let data = try Data(contentsOf: source)
+                    try data.write(to: dest, options: .atomic)
+                    appLog("Migrated \(filename) from \(legacyDir.path)")
+                    break
+                } catch let error as NSError where error.domain == NSCocoaErrorDomain && error.code == NSFileReadNoSuchFileError {
+                    continue
                 } catch {
-                    appLog("Failed to migrate \(filename): \(error)")
+                    appLog("Could not migrate \(filename) from \(legacyDir.path): \(error.localizedDescription). If macOS blocked the read, re-enter this config in the Stats → Debug panel.", type: .error)
                 }
             }
         }
@@ -55,21 +77,21 @@ class FileSystem {
 
     public func save(filename: String, data: Data) {
         let path = self.getDirectory().appendingPathComponent(filename)
-        appLog("saving to \(path)")
         do {
-            try data.write(to: path)
+            try data.write(to: path, options: .atomic)
         } catch {
-            appLog("Failed to write to \(path): \(error)")
+            appLog("Failed to write to \(path): \(error)", type: .error)
         }
     }
 
     public func load(filename: String) -> Data? {
         let path = self.getDirectory().appendingPathComponent(filename)
-        appLog("loading from \(path)")
         do {
             return try Data(contentsOf: path)
+        } catch let error as NSError where error.domain == NSCocoaErrorDomain && error.code == NSFileReadNoSuchFileError {
+            return nil
         } catch {
-            appLog("Failed to load from \(path): \(error)")
+            appLog("Failed to load from \(path): \(error)", type: .error)
             return nil
         }
     }

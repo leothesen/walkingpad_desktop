@@ -122,4 +122,4 @@ One row per day: aggregated distance/steps/duration/sessions, plus Strava sync s
 
 ## Config Persistence
 
-All config stored as JSON files in `~/Library/Containers/klassm.walkingpad-client/Data/Library/Autosave Information/` — no Keychain access, no password prompts.
+All config stored as JSON files in `~/Library/Application Support/walkingpad-client/` — no Keychain access, no password prompts. (Legacy locations under `Autosave Information` are migrated on first run; the old non-container path became inaccessible when macOS put it behind privacy protection.)

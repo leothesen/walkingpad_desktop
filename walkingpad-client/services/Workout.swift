@@ -54,7 +54,9 @@ class Workout: ObservableObject {
     /// Count of consecutive zero-step updates while a session is active.
     /// Used to detect belt stop even when the treadmill keeps reporting non-zero speed.
     private var consecutiveZeroStepUpdates: Int = 0
-    private let zeroStepThreshold: Int = 2  // ~8 seconds at 4s polling
+    /// Zero-step updates needed before a session is considered ended (~10s at 5s polling).
+    /// Read by the UI to render honest idle-detection progress.
+    let zeroStepThreshold: Int = 2
 
     /// Idle detection progress shown in the UI (0 when not idle, 1...threshold during detection).
     @Published public var idleProgress: Int = 0
@@ -224,6 +226,18 @@ class Workout: ObservableObject {
             self.hasNotifiedForCurrentSession = false
         }
 
+        // Safety: if the user tapped Stop but no session was active, there is no
+        // session-complete path to clear the stopping state — clear it once the
+        // treadmill reports it has stopped so the UI doesn't get stuck.
+        if !isWalking && self.currentSessionStart == nil {
+            DispatchQueue.main.async {
+                if self.isStopping && self.sessionSaveState == .none {
+                    self.isStopping = false
+                    self.idleProgress = 0
+                }
+            }
+        }
+
         // Defer @Published mutations to avoid SwiftUI re-entrancy warnings
         DispatchQueue.main.async {
             self.steps = self.steps + stepDiff
@@ -350,6 +364,10 @@ class Workout: ObservableObject {
             totalDistanceMeters: dailyDistances.reduce(0) { $0 + $1.distance },
             lastUpdated: Date()
         )
-        widgetData.write()
+        if let error = widgetData.write() {
+            // The widget's container is another app's container — macOS privacy
+            // protection can deny the write; surface it instead of going stale silently.
+            appLog("Widget data write failed: \(error.localizedDescription)", type: .error)
+        }
     }
 }

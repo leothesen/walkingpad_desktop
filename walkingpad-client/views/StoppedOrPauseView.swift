@@ -7,35 +7,27 @@ struct StoppedOrPausedView: View {
     @State private var showYesterdayConfirm: Bool = false
     @State private var isSyncingYesterday: Bool = false
     @State private var isStarting: Bool = false
-    @State private var startingTime: Date? = nil
+    @State private var startAttempt: Int = 0
+    @State private var startTimedOut: Bool = false
 
     var body: some View {
         VStack(spacing: 6) {
             WorkoutStateView()
 
             if isStarting {
-                TimelineView(.periodic(from: .now, by: 0.25)) { timeline in
-                    let elapsed = startingTime.map { timeline.date.timeIntervalSince($0) } ?? 0
-                    let progress = min(elapsed / 3.0, 1.0)
-
-                    VStack(spacing: 4) {
-                        Text("Starting")
-                            .font(.caption2.weight(.medium))
-                            .foregroundStyle(.green)
-                        ProgressView(value: progress, total: 1.0)
-                            .tint(.green)
-                    }
+                HStack(spacing: 6) {
+                    ProgressView()
+                        .controlSize(.mini)
+                    Text("Starting treadmill…")
+                        .font(.caption2.weight(.medium))
+                        .foregroundStyle(.green)
                 }
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 4)
                 .padding(.horizontal, 8)
                 .background(.green.opacity(0.1), in: .capsule)
             } else {
-                Button(action: {
-                    isStarting = true
-                    startingTime = Date()
-                    walkingPadService.command()?.wakeAndStart()
-                }) {
+                Button(action: startTreadmill) {
                     Text("Start")
                         .font(.caption.weight(.semibold))
                         .foregroundStyle(.green)
@@ -45,6 +37,12 @@ struct StoppedOrPausedView: View {
                 .buttonStyle(.plain)
                 .padding(.vertical, 4)
                 .background(.green.opacity(0.1), in: .capsule)
+
+                if startTimedOut {
+                    Text("Treadmill didn't respond — try again")
+                        .font(.caption2)
+                        .foregroundStyle(.orange)
+                }
             }
 
             if showYesterdaySync && !isStarting {
@@ -105,7 +103,35 @@ struct StoppedOrPausedView: View {
         .onAppear {
             checkYesterday()
             isStarting = false
-            startingTime = nil
+        }
+    }
+
+    /// Sends the wake+start command, then polls the treadmill for status more eagerly
+    /// than the regular 5s timer so the UI flips to RunningView as soon as the belt
+    /// actually reports movement. Times out after 15s instead of spinning forever.
+    private func startTreadmill() {
+        isStarting = true
+        startTimedOut = false
+        startAttempt += 1
+        let attempt = startAttempt
+
+        walkingPadService.command()?.wakeAndStart()
+
+        // wakeAndStart waits 1.5s before starting the belt; poll shortly after that
+        // and again a few times so we don't sit waiting for the slow timer.
+        for delay in [2.0, 3.0, 4.5, 6.5] {
+            DispatchQueue.main.asyncAfter(deadline: .now() + delay) {
+                if isStarting && startAttempt == attempt {
+                    walkingPadService.command()?.updateStatus()
+                }
+            }
+        }
+
+        DispatchQueue.main.asyncAfter(deadline: .now() + 15.0) {
+            if isStarting && startAttempt == attempt {
+                isStarting = false
+                startTimedOut = true
+            }
         }
     }
 

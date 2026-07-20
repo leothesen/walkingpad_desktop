@@ -6,10 +6,6 @@ struct ContentView: View {
     @EnvironmentObject var walkingPadService: WalkingPadService
     @EnvironmentObject var workout: Workout
 
-    private var stravaService: StravaService? {
-        (NSApp.delegate as? AppDelegate)?.stravaService
-    }
-
     static func relativeSyncTime(_ date: Date) -> String {
         let calendar = Calendar.current
         let timeFormatter = DateFormatter()
@@ -35,15 +31,14 @@ struct ContentView: View {
                 WaitingForTreadmillView()
             }
 
-            if let strava = stravaService {
-                StravaInfoBox(stravaService: strava)
-            }
+            StravaInfoBox(stravaService: StravaService.shared)
 
             Divider().opacity(0.15)
 
             FooterView()
         }
         .padding(10)
+        .frame(width: 200)
     }
 }
 

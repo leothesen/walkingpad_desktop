@@ -1,4 +1,5 @@
 import SwiftUI
+import AppKit
 
 enum DebugTab: String, CaseIterable {
     case activityLog = "Log"
@@ -16,6 +17,7 @@ struct DebugView: View {
     @ObservedObject var notionService: NotionService
     @ObservedObject var stravaService: StravaService
     @State private var selectedTab: DebugTab = .rawData
+    @State private var didCopyBleLog = false
 
     private static let timeFormatter: DateFormatter = {
         let f = DateFormatter()
@@ -389,6 +391,7 @@ struct DebugView: View {
                                 Text(entry.message)
                             }
                             .font(.system(size: 11, design: .monospaced))
+                            .textSelection(.enabled)
                             .padding(.horizontal, 12)
                             .padding(.vertical, 2)
                             .id(entry.id)
@@ -412,6 +415,21 @@ struct DebugView: View {
                     .font(.caption2)
                     .foregroundStyle(.secondary)
                 Spacer()
+                Button(didCopyBleLog ? "Copied!" : "Copy All") {
+                    let text = walkingPadService.debugLog.map {
+                        "\(Self.timeFormatter.string(from: $0.time)) \($0.message)"
+                    }.joined(separator: "\n")
+                    let pasteboard = NSPasteboard.general
+                    pasteboard.clearContents()
+                    pasteboard.setString(text, forType: .string)
+                    didCopyBleLog = true
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
+                        didCopyBleLog = false
+                    }
+                }
+                .buttonStyle(.plain)
+                .font(.caption2)
+                .foregroundStyle(didCopyBleLog ? .green : .blue)
                 Button("Clear") {
                     walkingPadService.debugLog.removeAll()
                 }
@@ -440,6 +458,20 @@ struct DebugView: View {
 
                 storageRow(
                     icon: "gearshape",
+                    title: "Notion Config",
+                    detail: storageInfo.notionSize,
+                    subtitle: storageInfo.notionSize != "—" ? "Configured" : "Not configured"
+                )
+
+                storageRow(
+                    icon: "gearshape",
+                    title: "Strava Config",
+                    detail: storageInfo.stravaSize,
+                    subtitle: storageInfo.stravaSize != "—" ? "Configured" : "Not configured"
+                )
+
+                storageRow(
+                    icon: "gearshape",
                     title: "MQTT Config",
                     detail: storageInfo.mqttSize,
                     subtitle: storageInfo.mqttExists ? "Configured" : "Not configured"
@@ -449,23 +481,16 @@ struct DebugView: View {
 
                 storageRow(
                     icon: "folder",
-                    title: "App Container",
+                    title: "Data Directory",
                     detail: storageInfo.containerSize,
                     subtitle: storageInfo.containerPath
-                )
-
-                storageRow(
-                    icon: "key",
-                    title: "Keychain",
-                    detail: "—",
-                    subtitle: "accessToken, refreshToken (if logged in)"
                 )
 
                 storageRow(
                     icon: "slider.horizontal.3",
                     title: "UserDefaults",
                     detail: "—",
-                    subtitle: "expiryDate"
+                    subtitle: "stravaSyncedDates"
                 )
             }
             .padding(12)
@@ -497,32 +522,32 @@ struct DebugView: View {
 
     private func computeStorageInfo() -> StorageInfo {
         let fs = FileSystem()
-        let containerURL = FileManager.default.urls(for: .autosavedInformationDirectory, in: .userDomainMask).first
+        let dataDir = FileSystem.directory
 
         let workoutsSize = fileSize(fs, filename: "workouts.json")
+        let notionSize = fileSize(fs, filename: ".walkingpad-client-notion.json")
+        let stravaSize = fileSize(fs, filename: ".walkingpad-client-strava.json")
         let mqttData = fs.load(filename: ".walkingpad-client-mqtt.json")
         let mqttSize = mqttData != nil ? formatBytes(mqttData!.count) : "—"
 
         var containerSize = "—"
-        var containerPath = "~/Library/Containers/klassm.walkingpad-client/"
-        if let url = containerURL {
-            containerPath = url.path
-            if let enumerator = FileManager.default.enumerator(at: url, includingPropertiesForKeys: [.fileSizeKey]) {
-                var total: Int64 = 0
-                while let fileURL = enumerator.nextObject() as? URL {
-                    let attrs = try? fileURL.resourceValues(forKeys: [.fileSizeKey])
-                    total += Int64(attrs?.fileSize ?? 0)
-                }
-                containerSize = formatBytes(Int(total))
+        if let enumerator = FileManager.default.enumerator(at: dataDir, includingPropertiesForKeys: [.fileSizeKey]) {
+            var total: Int64 = 0
+            while let fileURL = enumerator.nextObject() as? URL {
+                let attrs = try? fileURL.resourceValues(forKeys: [.fileSizeKey])
+                total += Int64(attrs?.fileSize ?? 0)
             }
+            containerSize = formatBytes(Int(total))
         }
 
         return StorageInfo(
             workoutsSize: workoutsSize,
+            notionSize: notionSize,
+            stravaSize: stravaSize,
             mqttSize: mqttSize,
             mqttExists: mqttData != nil,
             containerSize: containerSize,
-            containerPath: containerPath
+            containerPath: dataDir.path
         )
     }
 
@@ -545,6 +570,8 @@ struct DebugView: View {
 
 private struct StorageInfo {
     let workoutsSize: String
+    let notionSize: String
+    let stravaSize: String
     let mqttSize: String
     let mqttExists: Bool
     let containerSize: String

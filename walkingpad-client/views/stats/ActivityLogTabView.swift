@@ -1,10 +1,12 @@
 import SwiftUI
+import AppKit
 
 /// Isolated view for the activity log tab.
 /// Keeps ActivityLog observation separate from DebugView to prevent
 /// layout thrashing when the debug panel is toggled.
 struct ActivityLogTabView: View {
     @ObservedObject private var activityLog = ActivityLog.shared
+    @State private var didCopy = false
 
     private static let timeFormatter: DateFormatter = {
         let f = DateFormatter()
@@ -27,6 +29,7 @@ struct ActivityLogTabView: View {
                                     .foregroundStyle(logColor(entry.type))
                             }
                             .font(.system(size: 11, design: .monospaced))
+                            .textSelection(.enabled)
                             .padding(.horizontal, 12)
                             .padding(.vertical, 1)
                             .id(entry.id)
@@ -49,6 +52,12 @@ struct ActivityLogTabView: View {
                     .font(.caption2)
                     .foregroundStyle(.secondary)
                 Spacer()
+                Button(didCopy ? "Copied!" : "Copy All") {
+                    copyAllEntries()
+                }
+                .buttonStyle(.plain)
+                .font(.caption2)
+                .foregroundStyle(didCopy ? .green : .blue)
                 Button("Clear") {
                     activityLog.entries.removeAll()
                 }
@@ -58,6 +67,28 @@ struct ActivityLogTabView: View {
             }
             .padding(.horizontal, 12)
             .padding(.vertical, 6)
+        }
+    }
+
+    private func copyAllEntries() {
+        let text = activityLog.entries.map { entry in
+            "\(Self.timeFormatter.string(from: entry.time)) [\(label(entry.type))] \(entry.message)"
+        }.joined(separator: "\n")
+        let pasteboard = NSPasteboard.general
+        pasteboard.clearContents()
+        pasteboard.setString(text, forType: .string)
+        didCopy = true
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
+            didCopy = false
+        }
+    }
+
+    private func label(_ type: ActivityLogEntry.LogType) -> String {
+        switch type {
+        case .info: return "info"
+        case .success: return "ok"
+        case .error: return "error"
+        case .progress: return "sync"
         }
     }
 
