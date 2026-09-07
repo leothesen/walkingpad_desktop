@@ -84,6 +84,19 @@ class FileSystem {
         }
     }
 
+    /// Deletes a file if it is there. A missing file is the success case, so callers
+    /// can clear state unconditionally without first checking for it.
+    public func remove(filename: String) {
+        let path = self.getDirectory().appendingPathComponent(filename)
+        do {
+            try FileManager.default.removeItem(at: path)
+        } catch let error as NSError where error.domain == NSCocoaErrorDomain && error.code == NSFileNoSuchFileError {
+            return
+        } catch {
+            appLog("Failed to remove \(path): \(error)", type: .error)
+        }
+    }
+
     public func load(filename: String) -> Data? {
         let path = self.getDirectory().appendingPathComponent(filename)
         do {

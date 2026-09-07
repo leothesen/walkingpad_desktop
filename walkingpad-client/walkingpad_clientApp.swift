@@ -41,6 +41,11 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     override init() {
+        // Before anything else, so the log has a start marker to anchor to and the
+        // previous run's ending is on record while it can still be attributed.
+        let version = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "unknown"
+        let crashed = PersistentLog.shared.startSession(version: version, pid: ProcessInfo.processInfo.processIdentifier)
+
         self.walkingPadService = WalkingPadService()
         self.bluetoothDiscoverService = BluetoothDiscoveryService(walkingPadService)
         self.mqttService = MqttService(FileSystem())
@@ -101,6 +106,13 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             }
         }
 
+        // onSessionComplete is set above, so a session recovered from a crash
+        // checkpoint during Workout.init() can now be pushed on to Notion.
+        if crashed {
+            appLog("Previous run ended unexpectedly — see \(PersistentLog.shared.currentFile.path)", type: .error)
+        }
+        self.workout.flushRecoveredSession()
+
         self.mqttService.start()
         self.updateTimer?.start();
         self.bluetoothDiscoverService.start()
@@ -141,6 +153,13 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                 await self.stravaService.checkYesterdaySync(notionService: self.notionService)
             }
         }
+    }
+
+    /// Records that this run ended on purpose. Without it every quit looks identical
+    /// to a crash on the next launch, and the crash marker stops meaning anything.
+    func applicationWillTerminate(_ notification: Notification) {
+        workout.save()
+        PersistentLog.shared.finishSession(reason: "user quit")
     }
 
     /// Sets up the status bar menu item, starts the HTTP API server, and fetches today's stats.

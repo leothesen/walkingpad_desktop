@@ -48,10 +48,19 @@ open class WalkingPadService: NSObject, CBPeripheralDelegate, ObservableObject {
     public var debugLog: [BLELogEntry] = []
     private let maxLogEntries = 200
 
+    /// Shortest notification we can parse. Steps occupy bytes 11–13, so byte 13 has
+    /// to exist — 14 bytes, not 13. The treadmill does occasionally emit shorter
+    /// frames, and reading past the end of one is a hard trap in Swift rather than
+    /// a garbage value, so this bound is load-bearing.
+    static let minimumPayloadLength = 14
+
     public var callback: TreadmillCallback?
 
     private func log(_ message: String) {
         let entry = BLELogEntry(time: Date(), message: message)
+        // Also to disk: the in-memory buffer below holds 200 entries and dies with
+        // the process, and the frame that kills the app is the one worth keeping.
+        PersistentLog.shared.write(message, level: .trace)
         DispatchQueue.main.async {
             self.debugLog.append(entry)
             if self.debugLog.count > self.maxLogEntries {
@@ -123,6 +132,7 @@ open class WalkingPadService: NSObject, CBPeripheralDelegate, ObservableObject {
     /// - 0xF8 0xA2 (248, 162) → current real-time status
     /// - 0xF8 0xA7 (248, 167) → last session summary
     private func statusTypeFrom(_ bits: [UInt8]) -> StatusType? {
+        guard bits.count >= 2 else { return nil }
         if (bits[0] == 248 && bits[1] == 162) {
             return .currentStatus
         }
@@ -135,6 +145,12 @@ open class WalkingPadService: NSObject, CBPeripheralDelegate, ObservableObject {
     /// CoreBluetooth delegate: called when the FE01 characteristic sends a notification.
     /// Parses the binary payload into a DeviceState and fires the callback chain.
     public func peripheral(_ peripheral: CBPeripheral, didUpdateValueFor characteristic: CBCharacteristic, error: Error?) {
+        if let error = error {
+            log("RX error: \(error.localizedDescription)")
+            appLog("BLE read failed: \(error.localizedDescription)", type: .error)
+            return
+        }
+
         if let value = characteristic.value {
 
             let byteArray = [UInt8](value)
@@ -142,15 +158,18 @@ open class WalkingPadService: NSObject, CBPeripheralDelegate, ObservableObject {
             let hexString = byteArray.map { String(format: "%02x", $0) }.joined(separator: " ")
             log("RX [\(byteArray.count)B] \(hexString)")
 
-            guard let statusType = statusTypeFrom(Array(byteArray[0...2])) else { return }
-            guard let connection = self.connection else { return }
-
-            // Need at least 14 bytes to read steps at index 11-13
-            if (byteArray.count < 13) {
-                log("⚠ Short payload: \(byteArray.count) bytes")
-                appLog("Unknown status array length")
+            // Every field below is read at a fixed index, so the length check has to
+            // come before the first of them. It used to sit after `byteArray[0...2]`
+            // and it tested `< 13`, which let a 13-byte frame through to
+            // `byteArray[11...13]` — a trap that took the whole app down mid-walk.
+            guard byteArray.count >= WalkingPadService.minimumPayloadLength else {
+                log("⚠ Short payload: \(byteArray.count) bytes, need \(WalkingPadService.minimumPayloadLength)")
+                appLog("Ignoring short WalkingPad status frame (\(byteArray.count) bytes): \(hexString)", type: .error)
                 return
             }
+
+            guard let statusType = statusTypeFrom(byteArray) else { return }
+            guard let connection = self.connection else { return }
 
             let speed = byteArray[3]
             let isManualMode = byteArray[4] == 1

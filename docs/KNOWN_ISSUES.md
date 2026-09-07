@@ -11,8 +11,12 @@ Sessions deleted in Notion UI may still be returned by the API until the trash i
 ### 3. NSHostingView in NSMenu causes layout warnings
 `"It's not legal to call -layoutSubtreeIfNeeded on a view which is already being laid out"` — cosmetic AppKit warning from embedding SwiftUI in NSMenu. Harmless. Fix would require migrating to NSPopover.
 
+### 4. Notion push wipes workouts.json
+`AppDelegate.onSessionComplete` writes an empty `WorkoutsSaveData` over `workouts.json` after a successful Notion push. In-memory state means the next `save()` puts it back, so it is usually invisible — but an app death in that window leaves the local file empty. Only the local mirror is at risk; Notion holds the sessions.
+
 ## Resolved
 
+- **Crash on a short BLE frame, losing the in-flight session** — `WalkingPadService` sliced `byteArray[0...2]` before checking the payload length, and its later check tested `count < 13` while `byteArray[11...13]` needs 14. Payloads of 0, 1, 2 or 13 bytes trapped. On 2026-09-07 the treadmill's shutdown frame killed the app mid-session and took 2.62 km with it, because `todaySessions` — the only thing Notion and Strava read — is written when a session *ends*. Fixed by checking the length before any indexed read, and by `SessionCheckpoint`, which mirrors the running session to disk every update and recovers it at launch.
 - **RepeatingTimer ignoring interval** — Fixed: now uses `self.interval` instead of hardcoded 4 seconds
 - **EmptyView shadowing SwiftUI** — Fixed: deleted custom `EmptyView.swift`, uses SwiftUI's built-in
 - **exit(0) bypassing cleanup** — Fixed: replaced with `NSApplication.shared.terminate(nil)`
