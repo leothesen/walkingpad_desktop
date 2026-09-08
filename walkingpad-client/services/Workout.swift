@@ -75,6 +75,22 @@ class Workout: ObservableObject {
     /// Tracks whether we've already sent the 60-min notification for the current session.
     private var hasNotifiedForCurrentSession: Bool = false
 
+    /// When the daily totals last reached disk. Saving only on speed changes means a
+    /// steady hour-long walk never triggers one, so this bounds the exposure.
+    private var lastSaveTime: Date = .distantPast
+
+    /// Longest a session may run without the daily totals being written.
+    private let maxSaveInterval: TimeInterval = 60
+
+    /// Whether a checkpoint file is currently on disk, so an idle day does not
+    /// delete a file that is not there once every polling interval.
+    private var hasCheckpoint = false
+
+    /// A session recovered from a crash checkpoint at launch, waiting for
+    /// `onSessionComplete` to be wired up. Until it is flushed the recovery exists
+    /// only in workouts.json, and Notion and Strava still know nothing about it.
+    private(set) var pendingRecoveredSession: SessionSaveData? = nil
+
     /// Called when a session completes (speed → 0). Used to push to Notion.
     public var onSessionComplete: ((SessionSaveData, Int) -> Void)? = nil
 
@@ -149,7 +165,10 @@ class Workout: ObservableObject {
         if stepDiff < 0 || distanceDiff < 0 {
             return
         }
-        if oldState.speed != newState.speed {
+        // Speed changes are the natural save point, but a steady walk produces none
+        // for as long as it lasts — so also save on a timer while one is running.
+        if oldState.speed != newState.speed || Date().timeIntervalSince(lastSaveTime) >= maxSaveInterval {
+            lastSaveTime = Date()
             save()
         }
 
@@ -224,6 +243,23 @@ class Workout: ObservableObject {
             self.currentSessionDistance = 0
             self.consecutiveZeroStepUpdates = 0
             self.hasNotifiedForCurrentSession = false
+        }
+
+        // Mirror the in-flight session to disk on every update, and clear it the
+        // moment one ends. `todaySessions` only gains a session at the end, so
+        // without this an app death mid-walk keeps the distance in the daily total
+        // but loses the session — and Notion and Strava are both fed from sessions.
+        if let sessionStart = self.currentSessionStart {
+            SessionCheckpoint(
+                startTime: sessionStart,
+                lastUpdate: newState.time,
+                steps: self.currentSessionSteps,
+                distance: self.currentSessionDistance
+            ).save()
+            hasCheckpoint = true
+        } else if hasCheckpoint {
+            SessionCheckpoint.clear()
+            hasCheckpoint = false
         }
 
         // Safety: if the user tapped Stop but no session was active, there is no
@@ -316,8 +352,77 @@ class Workout: ObservableObject {
             self.lastUpdateTime = foundWorkout.date
             self.todaySessions = foundWorkout.sessions ?? []
         }
+
+        recoverInterruptedSession()
     }
-    
+
+    /// Restores a session that was still running when the app last died.
+    ///
+    /// A checkpoint on disk at launch means the previous run never reached the
+    /// session-end path. The walking happened and is already inside the daily
+    /// totals, but it never became a `SessionSaveData`, so as far as Notion and
+    /// Strava are concerned it does not exist. Recover it as a session that ended
+    /// at its last recorded update.
+    private func recoverInterruptedSession() {
+        guard let checkpoint = SessionCheckpoint.load() else { return }
+        SessionCheckpoint.clear()
+
+        guard Calendar.current.isDateInToday(checkpoint.startTime) else {
+            appLog("Discarding an interrupted session from \(checkpoint.startTime) — not today", type: .error)
+            return
+        }
+        guard checkpoint.distance > 0 || checkpoint.steps > 0 else { return }
+
+        // A checkpoint written moments before a clean session end would otherwise be
+        // recovered on top of the session it duplicates.
+        let alreadyRecorded = todaySessions.contains {
+            abs($0.startTime.timeIntervalSince(checkpoint.startTime)) < 1
+        }
+        guard !alreadyRecorded else { return }
+
+        let recovered = SessionSaveData(
+            startTime: checkpoint.startTime,
+            endTime: checkpoint.lastUpdate,
+            steps: checkpoint.steps,
+            distance: checkpoint.distance
+        )
+        todaySessions.append(recovered)
+        todaySessions.sort { $0.startTime < $1.startTime }
+        pendingRecoveredSession = recovered
+        appLog("Recovered an interrupted session: \(recovered.distance)m, \(recovered.steps) steps, ended \(checkpoint.lastUpdate)",
+               type: .success)
+
+        reconcileTotalsWithSessions()
+        save()
+    }
+
+    /// The daily totals accumulate on every update while sessions are only appended
+    /// when one ends, so the totals may legitimately lead the session list — but they
+    /// must never trail it. After a recovery they can, if the crash also cost the
+    /// last totals write.
+    private func reconcileTotalsWithSessions() {
+        let sessionDistance = todaySessions.reduce(0) { $0 + $1.distance }
+        let sessionSteps = todaySessions.reduce(0) { $0 + $1.steps }
+
+        if sessionDistance > self.distance {
+            appLog("Daily distance (\(self.distance)m) trailed the recorded sessions (\(sessionDistance)m) — raising it")
+            self.distance = sessionDistance
+        }
+        if sessionSteps > self.steps {
+            self.steps = sessionSteps
+        }
+    }
+
+    /// Fires `onSessionComplete` for a session recovered at launch. Call once, after
+    /// the callback has been wired up — `load()` runs from `init()`, long before it
+    /// exists, so without this the recovery never leaves the local file.
+    public func flushRecoveredSession() {
+        guard let session = pendingRecoveredSession else { return }
+        pendingRecoveredSession = nil
+        appLog("Pushing the recovered session to Notion", type: .success)
+        onSessionComplete?(session, todaySessions.count)
+    }
+
     /// Loads all historical workout entries. Silently truncates to the most recent 500.
     public func loadAll() -> [WorkoutSaveData] {
         let jsonDecoder = JSONDecoder()
