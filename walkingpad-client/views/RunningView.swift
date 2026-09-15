@@ -6,6 +6,16 @@ struct RunningView: View {
     @EnvironmentObject var walkingPadService: WalkingPadService
     @EnvironmentObject var workout: Workout
 
+    /// One-tap speeds shown under the slider, in km/h.
+    private static let speedPresets: [(label: String, kmh: Double)] = [
+        ("Quiet", 1.5),
+        ("Steady", 3.5),
+        ("Fast", 5.0),
+    ]
+
+    /// Step for the +/- buttons, in km/h. Matches the slider's step.
+    private static let nudgeStep = 0.5
+
     @State private var sliderSpeed: Double = 0
     @State private var isDragging: Bool = false
     @State private var showFinishConfirm: Bool = false
@@ -26,7 +36,7 @@ struct RunningView: View {
                     .foregroundStyle(.tertiary)
 
                 HStack(spacing: 6) {
-                    Button(action: { nudgeSpeed(-0.1) }) {
+                    Button(action: { nudgeSpeed(-Self.nudgeStep) }) {
                         Image(systemName: "minus")
                             .font(.caption2.weight(.semibold))
                             .frame(width: 20, height: 20)
@@ -44,7 +54,7 @@ struct RunningView: View {
                         }
                     }
 
-                    Button(action: { nudgeSpeed(0.1) }) {
+                    Button(action: { nudgeSpeed(Self.nudgeStep) }) {
                         Image(systemName: "plus")
                             .font(.caption2.weight(.semibold))
                             .frame(width: 20, height: 20)
@@ -54,6 +64,13 @@ struct RunningView: View {
                     .background(.ultraThinMaterial, in: .circle)
                 }
                 .padding(.top, 2)
+
+                HStack(spacing: 6) {
+                    ForEach(Self.speedPresets, id: \.kmh) { preset in
+                        presetButton(preset.label, kmh: preset.kmh)
+                    }
+                }
+                .padding(.top, 6)
             }
             .padding(.horizontal, 10)
             .padding(.vertical, 6)
@@ -284,11 +301,39 @@ struct RunningView: View {
         return merged.sorted { $0.startTime < $1.startTime }
     }
 
+    /// Moves one step up or down. An off-step speed (e.g. 3.2 set on the treadmill's
+    /// remote) snaps to the next step in that direction — 3.5 up, 3.0 down — so the
+    /// value lands back on the same grid as the slider.
     private func nudgeSpeed(_ delta: Double) {
-        let newSpeed = min(max(sliderSpeed + delta, 0.5), 8.0)
+        let steps = sliderSpeed / Self.nudgeStep
+        // Tolerance absorbs floating point noise so an on-step speed moves a full step
+        let target = delta > 0 ? (steps + 0.01).rounded(.up) : (steps - 0.01).rounded(.down)
+        setSpeed(target * Self.nudgeStep)
+    }
+
+    private func setSpeed(_ kmh: Double) {
+        let clamped = min(max(kmh, 0.5), 8.0)
         // Round to nearest 0.1 to avoid floating point drift
-        sliderSpeed = (newSpeed * 10).rounded() / 10
-        walkingPadService.command()?.setSpeed(speed: UInt8(sliderSpeed * 10))
+        sliderSpeed = (clamped * 10).rounded() / 10
+        walkingPadService.command()?.setSpeed(speed: UInt8((sliderSpeed * 10).rounded()))
+    }
+
+    private func presetButton(_ label: String, kmh: Double) -> some View {
+        let isCurrent = abs(sliderSpeed - kmh) < 0.05
+        return Button(action: { setSpeed(kmh) }) {
+            VStack(spacing: 0) {
+                Text(label)
+                    .font(.caption2.weight(.medium))
+                Text(String(format: "%.1f", kmh))
+                    .font(.system(size: 9).monospacedDigit())
+                    .foregroundStyle(isCurrent ? AnyShapeStyle(.primary) : AnyShapeStyle(.secondary))
+            }
+            .frame(maxWidth: .infinity)
+            .contentShape(Capsule())
+        }
+        .buttonStyle(.plain)
+        .padding(.vertical, 3)
+        .background(isCurrent ? AnyShapeStyle(.tint) : AnyShapeStyle(.ultraThinMaterial), in: .capsule)
     }
 
     private func modeButton(_ mode: WalkingMode, current: WalkingMode?) -> some View {
