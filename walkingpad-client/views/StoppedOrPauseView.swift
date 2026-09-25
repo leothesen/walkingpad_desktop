@@ -75,7 +75,7 @@ struct IdleView: View {
                 if starter.isStarting {
                     HStack(spacing: 8) {
                         ProgressView().controlSize(.small)
-                        Text("Starting treadmill…")
+                        Text("Starting treadmill")
                             .font(.callout.weight(.medium))
                     }
                     .frame(maxWidth: .infinity, minHeight: 36)

@@ -8,7 +8,7 @@ struct WaitingForTreadmillView: View {
 
             HStack(spacing: 8) {
                 ProgressView().controlSize(.small)
-                Text("Looking for WalkingPad…")
+                Text("Looking for WalkingPad")
                     .font(.callout)
                     .foregroundStyle(.secondary)
             }
