@@ -46,6 +46,9 @@
 		E500000200000000000000EE /* StravaService.swift in Sources */ = {isa = PBXBuildFile; fileRef = E500000100000000000000EE /* StravaService.swift */; };
 		E500000400000000000000EE /* StravaOAuthServer.swift in Sources */ = {isa = PBXBuildFile; fileRef = E500000300000000000000EE /* StravaOAuthServer.swift */; };
 		F600000200000000000000FF /* ActivityLog.swift in Sources */ = {isa = PBXBuildFile; fileRef = F600000100000000000000FF /* ActivityLog.swift */; };
+		K800000600000000000000KK /* StatusBarIcon.swift in Sources */ = {isa = PBXBuildFile; fileRef = K800000500000000000000KK /* StatusBarIcon.swift */; };
+		K800000400000000000000KK /* GoalSettings.swift in Sources */ = {isa = PBXBuildFile; fileRef = K800000300000000000000KK /* GoalSettings.swift */; };
+		K800000200000000000000KK /* SessionTracker.swift in Sources */ = {isa = PBXBuildFile; fileRef = K800000100000000000000KK /* SessionTracker.swift */; };
 		G700000200000000000000GG /* ActivityLogTabView.swift in Sources */ = {isa = PBXBuildFile; fileRef = G700000100000000000000GG /* ActivityLogTabView.swift */; };
 /* End PBXBuildFile section */
 
@@ -85,6 +88,9 @@
 		E500000100000000000000EE /* StravaService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StravaService.swift; sourceTree = "<group>"; };
 		E500000300000000000000EE /* StravaOAuthServer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StravaOAuthServer.swift; sourceTree = "<group>"; };
 		F600000100000000000000FF /* ActivityLog.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ActivityLog.swift; sourceTree = "<group>"; };
+		K800000500000000000000KK /* StatusBarIcon.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StatusBarIcon.swift; sourceTree = "<group>"; };
+		K800000300000000000000KK /* GoalSettings.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GoalSettings.swift; sourceTree = "<group>"; };
+		K800000100000000000000KK /* SessionTracker.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionTracker.swift; sourceTree = "<group>"; };
 		J100000100000000000000AA /* WidgetData.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WidgetData.swift; sourceTree = "<group>"; };
 		J100000200000000000000BB /* WalkingPadWidget.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WalkingPadWidget.swift; sourceTree = "<group>"; };
 		J100000300000000000000BB /* WalkingPadWidgetView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WalkingPadWidgetView.swift; sourceTree = "<group>"; };
@@ -207,6 +213,8 @@
 				F600000100000000000000FF /* ActivityLog.swift */,
 				5B43D84D267F761700A16916 /* RepeatingTimer.swift */,
 				5BA17252263EDB0F0010E483 /* Workout.swift */,
+				K800000300000000000000KK /* GoalSettings.swift */,
+				K800000100000000000000KK /* SessionTracker.swift */,
 			);
 			path = services;
 			sourceTree = "<group>";
@@ -215,6 +223,7 @@
 			isa = PBXGroup;
 			children = (
 				5BA17258263EF74F0010E483 /* DateExtension.swift */,
+				K800000500000000000000KK /* StatusBarIcon.swift */,
 			);
 			path = utils;
 			sourceTree = "<group>";
@@ -391,6 +400,9 @@ C300000200000000000000CC /* DebugView.swift in Sources */,
 			E500000200000000000000EE /* StravaService.swift in Sources */,
 			E500000400000000000000EE /* StravaOAuthServer.swift in Sources */,
 			F600000200000000000000FF /* ActivityLog.swift in Sources */,
+			K800000600000000000000KK /* StatusBarIcon.swift in Sources */,
+			K800000400000000000000KK /* GoalSettings.swift in Sources */,
+			K800000200000000000000KK /* SessionTracker.swift in Sources */,
 			J100001000000000000000AA /* WidgetData.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -491,7 +503,7 @@ C300000200000000000000CC /* DebugView.swift in Sources */,
 				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
-				MACOSX_DEPLOYMENT_TARGET = 15.0;
+				MACOSX_DEPLOYMENT_TARGET = 26.0;
 				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
 				MTL_FAST_MATH = YES;
 				ONLY_ACTIVE_ARCH = YES;
@@ -546,7 +558,7 @@ C300000200000000000000CC /* DebugView.swift in Sources */,
 				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
-				MACOSX_DEPLOYMENT_TARGET = 15.0;
+				MACOSX_DEPLOYMENT_TARGET = 26.0;
 				MTL_ENABLE_DEBUG_INFO = NO;
 				MTL_FAST_MATH = YES;
 				SDKROOT = macosx;
@@ -575,7 +587,7 @@ C300000200000000000000CC /* DebugView.swift in Sources */,
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
-				MACOSX_DEPLOYMENT_TARGET = 15.0;
+				MACOSX_DEPLOYMENT_TARGET = 26.0;
 				MARKETING_VERSION = 1.5.0;
 				PRODUCT_BUNDLE_IDENTIFIER = "klassm.walkingpad-client";
 				PRODUCT_NAME = "Walkingpad Client";
@@ -604,7 +616,7 @@ C300000200000000000000CC /* DebugView.swift in Sources */,
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
-				MACOSX_DEPLOYMENT_TARGET = 15.0;
+				MACOSX_DEPLOYMENT_TARGET = 26.0;
 				MARKETING_VERSION = 1.5.0;
 				PRODUCT_BUNDLE_IDENTIFIER = "klassm.walkingpad-client";
 				PRODUCT_NAME = "Walkingpad Client";
@@ -629,7 +641,7 @@ C300000200000000000000CC /* DebugView.swift in Sources */,
 					"@executable_path/../Frameworks",
 					"@executable_path/../../../../Frameworks",
 				);
-				MACOSX_DEPLOYMENT_TARGET = 15.0;
+				MACOSX_DEPLOYMENT_TARGET = 26.0;
 				MARKETING_VERSION = 1.5.0;
 				PRODUCT_BUNDLE_IDENTIFIER = "klassm.walkingpad-client.WalkingPadWidget";
 				PRODUCT_NAME = "$(TARGET_NAME)";
@@ -655,7 +667,7 @@ C300000200000000000000CC /* DebugView.swift in Sources */,
 					"@executable_path/../Frameworks",
 					"@executable_path/../../../../Frameworks",
 				);
-				MACOSX_DEPLOYMENT_TARGET = 15.0;
+				MACOSX_DEPLOYMENT_TARGET = 26.0;
 				MARKETING_VERSION = 1.5.0;
 				PRODUCT_BUNDLE_IDENTIFIER = "klassm.walkingpad-client.WalkingPadWidget";
 				PRODUCT_NAME = "$(TARGET_NAME)";

@@ -1,6 +1,7 @@
 import SwiftUI
 import UserNotifications
 import Sparkle
+import Combine
 
 /// Main app entry point. Uses a Settings scene with an empty view since this is a
 /// menu-bar-only app (LSUIElement = true in Info.plist hides it from the Dock).
@@ -22,7 +23,7 @@ struct MenuBarPopoverApp: App {
 /// - Sets up the callback chain: BLE → Workout → Notion / MQTT
 /// - Manages the status bar item and popover UI
 /// - Handles sleep/wake notifications to pause and resume services
-class AppDelegate: NSObject, NSApplicationDelegate {
+class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private var workout = Workout()
     private var walkingPadService: WalkingPadService
     private var bluetoothDiscoverService: BluetoothDiscoveryService
@@ -33,8 +34,8 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
     static let updaterController = SPUStandardUpdaterController(startingUpdater: false, updaterDelegate: nil, userDriverDelegate: nil)
 
-    var popover: NSPopover!
     var statusBarItem: NSStatusItem!
+    private var goalObserver: AnyCancellable?
 
     static func checkForUpdates() {
         updaterController.checkForUpdates(nil)
@@ -61,6 +62,10 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         // Slow treadmill when duration limit is hit
         workout.onSpeedNudge = { [weak self] speed in
             self?.walkingPadService.command()?.setSpeed(speed: speed)
+        }
+
+        workout.onSessionStateChange = { [weak self] in
+            self?.updateStatusBarTitle()
         }
 
         // Push completed sessions to Notion, then fetch today's total for status bar
@@ -177,38 +182,51 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             startHttpServer(walkingPadService: self.walkingPadService, workout: self.workout)
         }
 
-        // Create the SwiftUI popover hosted inside an NSMenu attached to the status bar icon.
-        // Width is fixed by ContentView; intrinsic sizing lets the menu height follow
-        // the content (connected/running/stopped states differ in height) instead of
-        // clipping against a hardcoded frame.
+        // The popover is a SwiftUI view hosted inside an NSMenu attached to the
+        // status item. Width is fixed by ContentView; intrinsic sizing lets the menu
+        // height follow the content, which differs per state.
         let view = NSHostingView(rootView: ContentView()
                                     .environmentObject(workout)
-                                    .environmentObject(walkingPadService))
+                                    .environmentObject(walkingPadService)
+                                    .environmentObject(GoalSettings.shared))
         view.sizingOptions = [.intrinsicContentSize]
         let menuItem = NSMenuItem()
         menuItem.view = view
-        view.frame = NSRect(x: 0, y: 0, width: 230, height: 380)
+        view.frame = NSRect(x: 0, y: 0, width: ContentView.width, height: 300)
 
         let menu = NSMenu()
+        menu.delegate = self
         menu.addItem(menuItem)
+        menu.addItem(.separator())
+        let updatesItem = NSMenuItem(title: "Check for Updates…", action: #selector(checkForUpdatesFromMenu), keyEquivalent: "")
+        updatesItem.target = self
+        menu.addItem(updatesItem)
+        let quitItem = NSMenuItem(title: "Quit WalkingPad", action: #selector(quitFromMenu), keyEquivalent: "q")
+        quitItem.target = self
+        menu.addItem(quitItem)
 
         self.statusBarItem = NSStatusBar.system.statusItem(withLength: CGFloat(NSStatusItem.variableLength))
         self.statusBarItem.menu = menu
         if let button = self.statusBarItem.button {
-            button.image = NSImage(named: "StatusIcon")
-            button.image?.isTemplate = true
             button.imagePosition = .imageLeading
             // Monospaced digits keep the item width stable while the timer ticks
             button.font = NSFont.monospacedDigitSystemFont(ofSize: NSFont.systemFontSize, weight: .regular)
         }
+        updateStatusBarTitle()
 
-        // Refresh the title every second while a session is active so the
-        // duration ticks live instead of jumping on each 5s BLE poll.
+        // Every second: advance session timing (so a quiet treadmill still pauses
+        // and ends a session) and refresh the title so the timer ticks live.
         let statusBarTimer = Timer(timeInterval: 1.0, repeats: true) { [weak self] _ in
-            guard let self = self, self.workout.currentSessionStartTime != nil else { return }
+            guard let self = self else { return }
+            self.workout.tick()
             self.updateStatusBarTitle()
         }
         RunLoop.main.add(statusBarTimer, forMode: .common)
+
+        // Redraw when the goal changes.
+        goalObserver = GoalSettings.shared.objectWillChange.sink { [weak self] _ in
+            DispatchQueue.main.async { self?.updateStatusBarTitle() }
+        }
 
         // Fetch today's total from Notion for the status bar on launch,
         // and check if yesterday's sessions need syncing to Strava
@@ -243,28 +261,78 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         self.walkingPadService.command()?.updateStatus()
     }
 
-    /// Updates the status bar to show live session stats when walking,
-    /// or today's total distance (from Notion) when idle.
+    @objc private func checkForUpdatesFromMenu() {
+        AppDelegate.checkForUpdates()
+    }
+
+    @objc private func quitFromMenu() {
+        walkingPadService.command()?.setSpeed(speed: 0)
+        workout.save()
+        NSApplication.shared.terminate(nil)
+    }
+
+    // MARK: - NSMenuDelegate
+
+    /// Whether a just-ended session was on screen while the menu was open.
+    private var recentSessionWasShown = false
+
+    func menuWillOpen(_ menu: NSMenu) {
+        recentSessionWasShown = workout.recentSession != nil
+    }
+
+    func menuDidClose(_ menu: NSMenu) {
+        // "Session saved" stays until it has been seen once.
+        if recentSessionWasShown {
+            workout.dismissRecentSession()
+        }
+        recentSessionWasShown = false
+    }
+
+    // MARK: - Status bar
+
+    /// Redraws the menu bar item: a goal ring plus one piece of text.
+    /// - Walking: session timer
+    /// - Just finished a session: "+0.42 km" for a few seconds
+    /// - Otherwise: today's total
     private func updateStatusBarTitle() {
         guard let button = self.statusBarItem?.button else { return }
 
-        // The icon stays visible in all states so the item doesn't change
-        // shape when a session starts or the menu is opened.
-        if let sessionStart = workout.currentSessionStartTime {
-            // Active session: show current session distance + duration
-            let dist = workout.sessionDistance
-            let elapsed = Int(Date().timeIntervalSince(sessionStart))
-            let mins = elapsed / 60
-            let secs = elapsed % 60
+        let goal = GoalSettings.shared
+        let progress = goal.progress(distanceMeters: workout.todayDistance, steps: workout.steps, seconds: workout.walkingSeconds)
+        let connected = walkingPadService.isConnected()
 
-            let distStr = dist >= 1000 ? String(format: "%.2f km", Double(dist) / 1000.0) : "\(dist) m"
-            button.title = " \(distStr) · \(mins):\(String(format: "%02d", secs))"
+        let style: StatusBarIcon.Style
+        let title: String
+
+        if let sessionStart = workout.currentSessionStartTime {
+            style = .walking
+            let elapsed = Int(Date().timeIntervalSince(sessionStart))
+            let hours = elapsed / 3600
+            let mins = (elapsed % 3600) / 60
+            let secs = elapsed % 60
+            title = hours > 0
+                ? String(format: "%d:%02d:%02d", hours, mins, secs)
+                : String(format: "%d:%02d", mins, secs)
         } else {
-            // Idle: show today's total (Notion total once synced, else local)
-            let totalDist = max(workout.todayTotalDistance, workout.distance)
-            button.title = totalDist > 0
-                ? " " + (totalDist >= 1000 ? String(format: "%.2f km", Double(totalDist) / 1000.0) : "\(totalDist) m")
-                : ""
+            style = !connected ? .disconnected : (progress >= 1 ? .goalReached : .progress)
+            if let recent = workout.recentSession,
+               let endedAt = workout.recentSessionEndedAt,
+               Date().timeIntervalSince(endedAt) < 5 {
+                title = "+" + Self.shortDistance(recent.distance)
+            } else {
+                let total = workout.todayDistance
+                title = total > 0 ? Self.shortDistance(total) : ""
+            }
         }
+
+        let image = StatusBarIcon.image(style: style, progress: progress)
+        if button.image !== image { button.image = image }
+        let spaced = title.isEmpty ? "" : " " + title
+        if button.title != spaced { button.title = spaced }
+    }
+
+    /// "2.7 km" / "640 m" — one decimal keeps the menu bar item narrow.
+    static func shortDistance(_ meters: Int) -> String {
+        meters >= 1000 ? String(format: "%.1f km", Double(meters) / 1000.0) : "\(meters) m"
     }
 }

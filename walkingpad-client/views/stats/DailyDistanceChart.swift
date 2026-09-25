@@ -7,6 +7,8 @@ import Charts
 struct DistanceTrendChart: View {
     let points: [DailyPoint]
     let granularity: ChartGranularity
+    /// Daily goal in km; drawn as a dashed line on daily bars. Nil hides it.
+    var goalKm: Double? = nil
     @Binding var hoveredPoint: DailyPoint?
     /// Normalized X position of the hovered bar (0.0 = left edge, 1.0 = right edge)
     @Binding var hoverFraction: CGFloat
@@ -25,6 +27,13 @@ struct DistanceTrendChart: View {
         return Calendar.current.dateComponents([.day], from: first, to: last).day ?? 0
     }
 
+    /// Goal-met days in full green, others lighter; monthly bars a single mid tone.
+    private func barColor(_ point: DailyPoint) -> Color {
+        guard granularity == .day else { return Color.green.opacity(0.7) }
+        if let goalKm, point.distanceKm >= goalKm { return Color.green }
+        return Color.green.opacity(0.45)
+    }
+
     var body: some View {
         Chart {
             ForEach(points) { point in
@@ -32,15 +41,20 @@ struct DistanceTrendChart: View {
                     x: .value("Date", point.date, unit: barUnit),
                     y: .value("Distance", point.distanceKm)
                 )
-                .foregroundStyle(
-                    .linearGradient(
-                        colors: [.blue, .blue.opacity(0.4)],
-                        startPoint: .top,
-                        endPoint: .bottom
-                    )
-                )
+                .foregroundStyle(barColor(point))
                 .cornerRadius(4)
                 .opacity(hoveredPoint?.date == point.date ? 1.0 : (hoveredPoint != nil ? 0.5 : 1.0))
+            }
+
+            if let goalKm {
+                RuleMark(y: .value("Goal", goalKm))
+                    .foregroundStyle(.secondary)
+                    .lineStyle(StrokeStyle(lineWidth: 1.5, dash: [5, 4]))
+                    .annotation(position: .top, alignment: .trailing) {
+                        Text(String(format: "%g km goal", goalKm))
+                            .font(.caption2.weight(.semibold))
+                            .foregroundStyle(.secondary)
+                    }
             }
 
             if let hovered = hoveredPoint {
