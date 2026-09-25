@@ -69,7 +69,7 @@ struct WalkingView: View {
             let remaining = workout.pauseDeadline.map { max(0, Int($0.timeIntervalSince(now).rounded())) } ?? 0
             statusDot(color: .orange, text: "Paused · ends in \(remaining)s")
         case .stopping:
-            statusDot(color: .red, text: "Stopping…")
+            statusDot(color: .red, text: "Stopping")
         default:
             statusDot(color: .green, text: workout.currentSessionStartTime == nil ? "Belt running" : "Walking")
         }
@@ -128,32 +128,47 @@ struct WalkingView: View {
     private func presetRow(mode: WalkingMode?) -> some View {
         HStack(spacing: 4) {
             ForEach(SpeedPresets.all, id: \.kmh) { preset in
-                let isCurrent = abs(targetSpeed - preset.kmh) < 0.05
-                Button { setSpeed(preset.kmh) } label: {
-                    Text(preset.label)
-                        .font(.caption.weight(isCurrent ? .semibold : .regular))
-                        .frame(maxWidth: .infinity)
+                selectableButton(
+                    preset.label,
+                    isSelected: abs(targetSpeed - preset.kmh) < 0.05,
+                    help: String(format: "%.1f km/h", preset.kmh)
+                ) {
+                    setSpeed(preset.kmh)
                 }
-                .buttonStyle(.glass)
-                .tint(isCurrent ? .green : nil)
-                .help(String(format: "%.1f km/h", preset.kmh))
             }
 
             if let mode {
                 let isAuto = mode == .automatic
-                Button {
+                selectableButton("Auto", isSelected: isAuto, help: "Automatic mode: the belt follows where you stand") {
                     walkingPadService.command()?.setWalkingMode(mode: isAuto ? .manual : .automatic)
-                } label: {
-                    Text("Auto")
-                        .font(.caption.weight(isAuto ? .semibold : .regular))
-                        .frame(maxWidth: .infinity)
                 }
-                .buttonStyle(.glass)
-                .tint(isAuto ? .green : nil)
-                .help("Automatic mode: the belt follows where you stand")
             }
         }
         .disabled(workout.sessionPhase == .stopping)
+    }
+
+    /// A preset that turns solid green while it's the active choice.
+    @ViewBuilder
+    private func selectableButton(_ title: String, isSelected: Bool, help: String, action: @escaping () -> Void) -> some View {
+        if isSelected {
+            Button(action: action) {
+                Text(title)
+                    .font(.caption.weight(.semibold))
+                    .frame(maxWidth: .infinity)
+            }
+            .buttonStyle(.glassProminent)
+            .tint(.green)
+            .help(help)
+            .accessibilityAddTraits(.isSelected)
+        } else {
+            Button(action: action) {
+                Text(title)
+                    .font(.caption)
+                    .frame(maxWidth: .infinity)
+            }
+            .buttonStyle(.glass)
+            .help(help)
+        }
     }
 
     // MARK: - Day
@@ -198,7 +213,7 @@ struct WalkingView: View {
         if workout.sessionPhase == .stopping {
             HStack(spacing: 8) {
                 ProgressView().controlSize(.small)
-                Text("Finishing session…")
+                Text("Finishing session")
                     .font(.callout.weight(.medium))
             }
             .frame(maxWidth: .infinity, minHeight: 36)
@@ -313,7 +328,7 @@ struct SessionEndedView: View {
         case .posting:
             HStack(spacing: 6) {
                 ProgressView().controlSize(.small)
-                Text("Posting…").font(.callout.weight(.medium))
+                Text("Posting").font(.callout.weight(.medium))
             }
             .frame(maxWidth: .infinity, minHeight: 36)
             .glassEffect(.regular.tint(.orange.opacity(0.25)), in: .capsule)

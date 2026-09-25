@@ -192,7 +192,7 @@ struct DebugView: View {
                     Text("API Key")
                         .font(.caption2)
                         .foregroundStyle(.tertiary)
-                    SecureField("ntn_...", text: $notionApiKey)
+                    SecureField("Notion API key", text: $notionApiKey)
                         .textFieldStyle(.roundedBorder)
                         .font(.caption.monospaced())
                 }

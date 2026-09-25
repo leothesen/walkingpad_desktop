@@ -23,7 +23,7 @@ struct MenuBarPopoverApp: App {
 /// - Sets up the callback chain: BLE → Workout → Notion / MQTT
 /// - Manages the status bar item and popover UI
 /// - Handles sleep/wake notifications to pause and resume services
-class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
+class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
     private var workout = Workout()
     private var walkingPadService: WalkingPadService
     private var bluetoothDiscoverService: BluetoothDiscoveryService
@@ -35,6 +35,9 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     static let updaterController = SPUStandardUpdaterController(startingUpdater: false, updaterDelegate: nil, userDriverDelegate: nil)
 
     var statusBarItem: NSStatusItem!
+    private var popover: NSPopover!
+    /// Right-click menu on the status item (Quit).
+    private var contextMenu: NSMenu!
     private var goalObserver: AnyCancellable?
 
     static func checkForUpdates() {
@@ -182,35 +185,35 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             startHttpServer(walkingPadService: self.walkingPadService, workout: self.workout)
         }
 
-        // The popover is a SwiftUI view hosted inside an NSMenu attached to the
-        // status item. Width is fixed by ContentView; intrinsic sizing lets the menu
-        // height follow the content, which differs per state.
-        let view = NSHostingView(rootView: ContentView()
+        // The popover is a system NSPopover, so it gets the standard Liquid Glass
+        // background and follows the system's glass and light/dark settings.
+        // Width is fixed by ContentView; preferredContentSize lets the height
+        // follow the content, which differs per state.
+        let hostingController = NSHostingController(rootView: ContentView()
                                     .environmentObject(workout)
                                     .environmentObject(walkingPadService)
                                     .environmentObject(GoalSettings.shared))
-        view.sizingOptions = [.intrinsicContentSize]
-        let menuItem = NSMenuItem()
-        menuItem.view = view
-        view.frame = NSRect(x: 0, y: 0, width: ContentView.width, height: 300)
+        hostingController.sizingOptions = [.preferredContentSize]
 
-        let menu = NSMenu()
-        menu.delegate = self
-        menu.addItem(menuItem)
-        menu.addItem(.separator())
-        let updatesItem = NSMenuItem(title: "Check for Updates…", action: #selector(checkForUpdatesFromMenu), keyEquivalent: "")
-        updatesItem.target = self
-        menu.addItem(updatesItem)
+        self.popover = NSPopover()
+        popover.contentViewController = hostingController
+        popover.behavior = .transient
+        popover.animates = true
+        popover.delegate = self
+
+        self.contextMenu = NSMenu()
         let quitItem = NSMenuItem(title: "Quit WalkingPad", action: #selector(quitFromMenu), keyEquivalent: "q")
         quitItem.target = self
-        menu.addItem(quitItem)
+        contextMenu.addItem(quitItem)
 
         self.statusBarItem = NSStatusBar.system.statusItem(withLength: CGFloat(NSStatusItem.variableLength))
-        self.statusBarItem.menu = menu
         if let button = self.statusBarItem.button {
             button.imagePosition = .imageLeading
             // Monospaced digits keep the item width stable while the timer ticks
             button.font = NSFont.monospacedDigitSystemFont(ofSize: NSFont.systemFontSize, weight: .regular)
+            button.target = self
+            button.action = #selector(statusItemClicked(_:))
+            button.sendAction(on: [.leftMouseUp, .rightMouseUp])
         }
         updateStatusBarTitle()
 
@@ -261,26 +264,47 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         self.walkingPadService.command()?.updateStatus()
     }
 
-    @objc private func checkForUpdatesFromMenu() {
-        AppDelegate.checkForUpdates()
+    @objc private func quitFromMenu() {
+        AppDelegate.quit(walkingPadService: walkingPadService, workout: workout)
     }
 
-    @objc private func quitFromMenu() {
+    /// Stops the belt, saves, and quits. Shared by the right-click menu and the popover.
+    static func quit(walkingPadService: WalkingPadService, workout: Workout) {
         walkingPadService.command()?.setSpeed(speed: 0)
         workout.save()
         NSApplication.shared.terminate(nil)
     }
 
-    // MARK: - NSMenuDelegate
+    // MARK: - Popover
 
-    /// Whether a just-ended session was on screen while the menu was open.
+    /// Left click toggles the popover; right click (or control-click) shows Quit.
+    @objc private func statusItemClicked(_ sender: NSStatusBarButton) {
+        let event = NSApp.currentEvent
+        let isContextClick = event?.type == .rightMouseUp || event?.modifierFlags.contains(.control) == true
+        if isContextClick {
+            popover.performClose(nil)
+            statusBarItem.menu = contextMenu
+            sender.performClick(nil)
+            statusBarItem.menu = nil
+            return
+        }
+
+        if popover.isShown {
+            popover.performClose(nil)
+        } else {
+            popover.show(relativeTo: sender.bounds, of: sender, preferredEdge: .minY)
+            popover.contentViewController?.view.window?.makeKey()
+        }
+    }
+
+    /// Whether a just-ended session was on screen while the popover was open.
     private var recentSessionWasShown = false
 
-    func menuWillOpen(_ menu: NSMenu) {
+    func popoverWillShow(_ notification: Notification) {
         recentSessionWasShown = workout.recentSession != nil
     }
 
-    func menuDidClose(_ menu: NSMenu) {
+    func popoverDidClose(_ notification: Notification) {
         // "Session saved" stays until it has been seen once.
         if recentSessionWasShown {
             workout.dismissRecentSession()

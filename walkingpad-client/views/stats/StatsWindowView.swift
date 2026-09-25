@@ -29,7 +29,7 @@ struct StatsWindowView: View {
                 if viewModel.isLoading {
                     VStack(spacing: 10) {
                         ProgressView()
-                        Text("Loading from Notion…")
+                        Text("Loading from Notion")
                             .font(.callout)
                             .foregroundStyle(.secondary)
                     }
@@ -329,9 +329,6 @@ struct StatsWindowView: View {
                 statusDot(notionService.isConfigured, "Notion")
                 statusDot(stravaService.isConnected, "Strava")
                 Spacer(minLength: 0)
-                Text(viewModel.dataSource)
-                    .foregroundStyle(.tertiary)
-                    .lineLimit(1)
             }
             .font(.caption)
             .foregroundStyle(.secondary)

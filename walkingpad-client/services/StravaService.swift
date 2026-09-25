@@ -188,7 +188,7 @@ class StravaService: ObservableObject {
 
         // Check Notion Day Totals for existing post
         if let notion = notionService {
-            log.progress("Checking if already posted today…")
+            log.progress("Checking if already posted today")
             if let dayTotal = await notion.fetchDayTotal(for: Date()), dayTotal.stravaPosted {
                 log.info("Already posted to Strava today")
                 await MainActor.run { isSyncedToday = true; syncedDate = Date() }
@@ -201,7 +201,7 @@ class StravaService: ObservableObject {
             lastError = nil
         }
 
-        log.progress("Refreshing Strava token…")
+        log.progress("Refreshing Strava token")
         await refreshTokenIfNeeded()
         guard let token = accessToken else {
             log.error("Not authenticated with Strava")
@@ -220,7 +220,7 @@ class StravaService: ObservableObject {
         let distKm = Double(totalDistance) / 1000.0
         let avgSpeed = totalSeconds > 0 ? (distKm / (Double(totalSeconds) / 3600.0)) : 0
 
-        log.progress("Posting \(String(format: "%.1f", distKm))km to Strava (\(sessions.count) sessions)…")
+        log.progress("Posting \(String(format: "%.1f", distKm))km to Strava (\(sessions.count) sessions)")
 
         let iso8601 = ISO8601DateFormatter()
         iso8601.formatOptions = [.withInternetDateTime]
@@ -254,7 +254,7 @@ class StravaService: ObservableObject {
 
                 // Update Notion Day Totals
                 if let notion = notionService {
-                    log.progress("Saving day totals to Notion…")
+                    log.progress("Saving day totals to Notion")
                     let updated = await notion.upsertDayTotal(date: Date(), sessions: sessions, stravaActivityId: activityId)
                     log.info("Day totals \(updated ? "saved to Notion" : "failed to save")")
                 }
@@ -377,7 +377,7 @@ class StravaService: ObservableObject {
             lastError = nil
         }
 
-        log.progress("Refreshing Strava token…")
+        log.progress("Refreshing Strava token")
         await refreshTokenIfNeeded()
         guard let token = accessToken else {
             log.error("Not authenticated with Strava")
@@ -392,7 +392,7 @@ class StravaService: ObservableObject {
         let distKm = Double(totalDistance) / 1000.0
         let avgSpeed = totalSeconds > 0 ? (distKm / (Double(totalSeconds) / 3600.0)) : 0
 
-        log.progress("Posting yesterday's \(String(format: "%.1f", distKm))km to Strava (\(sessions.count) sessions)…")
+        log.progress("Posting yesterday's \(String(format: "%.1f", distKm))km to Strava (\(sessions.count) sessions)")
 
         let iso8601 = ISO8601DateFormatter()
         iso8601.formatOptions = [.withInternetDateTime]
@@ -423,7 +423,7 @@ class StravaService: ObservableObject {
 
                 log.success("Posted yesterday to Strava! Activity ID: \(activityId)")
 
-                log.progress("Saving day totals to Notion…")
+                log.progress("Saving day totals to Notion")
                 let updated = await notionService.upsertDayTotal(date: yesterday, sessions: sessions, stravaActivityId: activityId)
                 log.info("Day totals \(updated ? "saved to Notion" : "failed to save")")
 

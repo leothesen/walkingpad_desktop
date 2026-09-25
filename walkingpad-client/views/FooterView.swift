@@ -48,7 +48,7 @@ enum StravaDayPoster {
 }
 
 /// Bottom row of the idle states: Stats, and Strava only when there's something to do.
-/// Updates and Quit live in the native menu items below the popover.
+/// Quit is also on the status item's right-click menu.
 struct FooterView: View {
     @EnvironmentObject var walkingPadService: WalkingPadService
     @EnvironmentObject var workout: Workout
@@ -71,6 +71,17 @@ struct FooterView: View {
             stravaChip
 
             Spacer(minLength: 0)
+
+            Button {
+                AppDelegate.quit(walkingPadService: walkingPadService, workout: workout)
+            } label: {
+                Image(systemName: "power")
+                    .font(.caption.weight(.semibold))
+            }
+            .buttonStyle(.glass)
+            .buttonBorderShape(.circle)
+            .help("Quit WalkingPad")
+            .accessibilityLabel("Quit WalkingPad")
         }
     }
 
@@ -133,21 +144,13 @@ struct FooterView: View {
         .environmentObject(workout)
 
         let hostingView = NSHostingView(rootView: statsView)
-        hostingView.translatesAutoresizingMaskIntoConstraints = false
 
-        // Behind-window blur, so the desktop shows through the window like the
-        // system's own glass surfaces. Follows the system appearance.
-        let background = NSVisualEffectView()
-        background.material = .underWindowBackground
-        background.blendingMode = .behindWindow
-        background.state = .followsWindowActiveState
-        background.addSubview(hostingView)
-        NSLayoutConstraint.activate([
-            hostingView.leadingAnchor.constraint(equalTo: background.leadingAnchor),
-            hostingView.trailingAnchor.constraint(equalTo: background.trailingAnchor),
-            hostingView.topAnchor.constraint(equalTo: background.topAnchor),
-            hostingView.bottomAnchor.constraint(equalTo: background.bottomAnchor),
-        ])
+        // Liquid Glass behind the whole window, so the desktop shows through.
+        // Clear style keeps it as transparent as the system allows; it follows the
+        // system's light/dark appearance.
+        let background = NSGlassEffectView()
+        background.style = .clear
+        background.contentView = hostingView
 
         let window = NSWindow(
             contentRect: NSRect(x: 0, y: 0, width: 960, height: 820),
@@ -155,6 +158,8 @@ struct FooterView: View {
             backing: .buffered,
             defer: false
         )
+        window.isOpaque = false
+        window.backgroundColor = .clear
         window.titlebarAppearsTransparent = true
         window.titleVisibility = .hidden
         window.title = "WalkingPad Stats"
