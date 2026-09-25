@@ -1,96 +1,12 @@
 import SwiftUI
 
-/// Root view for the status bar popover.
-/// Shows DeviceView when a treadmill is connected, otherwise WaitingForTreadmillView.
+/// Root view of the menu bar popover. Only as tall as the current state needs.
 struct ContentView: View {
-    @EnvironmentObject var walkingPadService: WalkingPadService
-    @EnvironmentObject var workout: Workout
-
-    static func relativeSyncTime(_ date: Date) -> String {
-        let calendar = Calendar.current
-        let timeFormatter = DateFormatter()
-        timeFormatter.dateFormat = "h:mm a"
-        let time = timeFormatter.string(from: date).lowercased()
-
-        if calendar.isDateInToday(date) {
-            return "today at \(time)"
-        } else if calendar.isDateInYesterday(date) {
-            return "yesterday at \(time)"
-        } else {
-            let dayFormatter = DateFormatter()
-            dayFormatter.dateFormat = "MMM d"
-            return "\(dayFormatter.string(from: date)) at \(time)"
-        }
-    }
+    static let width: CGFloat = 280
 
     var body: some View {
-        VStack(spacing: 8) {
-            if walkingPadService.isConnected() {
-                DeviceView()
-            } else {
-                WaitingForTreadmillView()
-            }
-
-            StravaInfoBox(stravaService: StravaService.shared)
-
-            Spacer(minLength: 0)
-
-            Divider().opacity(0.15)
-
-            FooterView()
-        }
-        .padding(12)
-        .frame(width: 230)
-        // Tall enough for the biggest state (running view with all controls +
-        // Strava box + footer) so nothing ever clips; shorter states pin the
-        // footer to the bottom via the Spacer.
-        .frame(minHeight: 380, alignment: .top)
-    }
-}
-
-/// Info box showing Strava sync status — unsynced sessions and upload results.
-struct StravaInfoBox: View {
-    @ObservedObject var stravaService: StravaService
-
-    var body: some View {
-        let hasUnsynced = stravaService.unsyncedSessionCount > 0 && stravaService.unsyncedDateLabel != nil
-        let hasResult = stravaService.uploadResultMessage != nil
-        let hasSyncTime = stravaService.isConnected && stravaService.lastStravaSync != nil
-
-        if hasUnsynced || hasResult || hasSyncTime {
-            VStack(spacing: 3) {
-                if let message = stravaService.uploadResultMessage {
-                    HStack(spacing: 4) {
-                        Image(systemName: stravaService.uploadResultIsError ? "xmark.circle.fill" : "checkmark.circle.fill")
-                            .font(.system(size: 9))
-                            .foregroundStyle(stravaService.uploadResultIsError ? .red : .green)
-                        Text(message)
-                            .font(.system(size: 10, weight: .medium))
-                            .foregroundStyle(stravaService.uploadResultIsError ? .red : .green)
-                    }
-                }
-
-                if hasUnsynced {
-                    HStack(spacing: 4) {
-                        Image(systemName: "exclamationmark.triangle.fill")
-                            .font(.system(size: 9))
-                            .foregroundStyle(.orange)
-                        Text("\(stravaService.unsyncedSessionCount) unsynced session\(stravaService.unsyncedSessionCount == 1 ? "" : "s") from \(stravaService.unsyncedDateLabel!)")
-                            .font(.system(size: 10))
-                            .foregroundStyle(.secondary)
-                    }
-                }
-
-                if hasSyncTime, let syncDate = stravaService.lastStravaSync {
-                    Text("Last sync: \(ContentView.relativeSyncTime(syncDate))")
-                        .font(.system(size: 9))
-                        .foregroundStyle(.tertiary)
-                }
-            }
-            .frame(maxWidth: .infinity)
-            .padding(.vertical, 5)
-            .padding(.horizontal, 8)
-            .background(.ultraThinMaterial, in: .rect(cornerRadius: 8))
-        }
+        DeviceView()
+            .padding(14)
+            .frame(width: ContentView.width, alignment: .topLeading)
     }
 }

@@ -18,16 +18,16 @@ struct WorkoutState {
 /// Key behaviors:
 /// - Computes diffs between consecutive BLE state updates to accumulate counters
 /// - Guards against negative diffs (treadmill counter reset) and reconnection bursts
+/// - Delegates session start/pause/end decisions to `SessionTracker` (time-based)
 /// - Resets daily counters at midnight (checked every polling interval)
-/// - Fires `onChangeCallback` for the StepsUploader to detect treadmill stop events
-/// - Saves on speed changes; keeps up to 500 historical workout entries
+/// - Saves on speed changes and at least once a minute while walking
 class Workout: ObservableObject {
     @Published
     public var steps: Int = 0
-    
+
     @Published
     public var distance: Int = 0
-    
+
     @Published
     public var walkingSeconds: Int = 0
 
@@ -37,39 +37,43 @@ class Workout: ObservableObject {
 
     public var lastUpdateTime: Date = Date()
 
-    // Session tracking state
-    /// Exposed for status bar display of session duration.
-    private(set) var currentSessionStart: Date? = nil
-    var currentSessionStartTime: Date? { currentSessionStart }
+    /// Decides session boundaries. Mutated only on the main thread (BLE callbacks
+    /// and timers both run there).
+    private var tracker = SessionTracker()
+
+    /// Start of the session in progress, nil when none is active.
+    @Published public private(set) var sessionStart: Date? = nil
+    var currentSessionStartTime: Date? { sessionStart }
+
+    /// Where the session in progress stands: walking, paused (no steps for a
+    /// while) or stopping (the user tapped Stop and the belt is winding down).
+    @Published public private(set) var sessionPhase: SessionTracker.Phase = .idle
+
+    /// When a paused session will end if walking doesn't resume.
+    @Published public private(set) var pauseDeadline: Date? = nil
 
     /// Current session stats — reset on each new session start.
     @Published public var sessionSteps: Int = 0
     @Published public var sessionDistance: Int = 0
 
-    private var currentSessionSteps: Int = 0
-    private var currentSessionDistance: Int = 0
-
     /// Today's total distance fetched from Notion (set after session ends).
     @Published public var todayTotalDistance: Int = 0
-    /// Count of consecutive zero-step updates while a session is active.
-    /// Used to detect belt stop even when the treadmill keeps reporting non-zero speed.
-    private var consecutiveZeroStepUpdates: Int = 0
-    /// Zero-step updates needed before a session is considered ended (~10s at 5s polling).
-    /// Read by the UI to render honest idle-detection progress.
-    let zeroStepThreshold: Int = 2
 
-    /// Idle detection progress shown in the UI (0 when not idle, 1...threshold during detection).
-    @Published public var idleProgress: Int = 0
-    /// Set when user explicitly taps Stop — triggers immediate idle UI.
-    @Published public var isStopping: Bool = false
-    /// Session save state shown in the UI.
-    @Published public var sessionSaveState: SessionSaveState = .none
+    /// The session that just ended, shown as "Session saved" in the popover until
+    /// the popover has been seen (or `recentSessionLifetime` passes).
+    @Published public private(set) var recentSession: SessionSaveData? = nil
+    /// When `recentSession` ended, used for the menu bar's brief "+0.42 km".
+    public private(set) var recentSessionEndedAt: Date? = nil
+    private let recentSessionLifetime: TimeInterval = 10 * 60
 
-    enum SessionSaveState: Equatable {
+    /// Progress of the "Done for today" Strava post.
+    @Published public var finishDayState: FinishDayState = .none
+
+    enum FinishDayState: Equatable {
         case none
-        case saving
-        case uploading
-        case complete
+        case posting
+        case posted
+        case failed
     }
 
     /// Tracks whether we've already sent the 60-min notification for the current session.
@@ -91,12 +95,15 @@ class Workout: ObservableObject {
     /// only in workouts.json, and Notion and Strava still know nothing about it.
     private(set) var pendingRecoveredSession: SessionSaveData? = nil
 
-    /// Called when a session completes (speed → 0). Used to push to Notion.
+    /// Called when a session completes. Used to push to Notion.
     public var onSessionComplete: ((SessionSaveData, Int) -> Void)? = nil
 
     /// Called when the duration limit is hit. Passes the target speed (raw, tenths of km/h).
     public var onSpeedNudge: ((UInt8) -> Void)? = nil
-    
+
+    /// Called after every session phase change so the status bar can redraw.
+    public var onSessionStateChange: (() -> Void)? = nil
+
     init() {
         self.load()
     }
@@ -104,7 +111,7 @@ class Workout: ObservableObject {
     /// Sends a macOS notification if the current session has been going for 60+ minutes.
     /// Only fires once per session.
     private func sendWalkingDurationNotificationIfNeeded() {
-        guard let start = currentSessionStart, !hasNotifiedForCurrentSession else { return }
+        guard let start = tracker.start, !hasNotifiedForCurrentSession else { return }
         let elapsed = Date().timeIntervalSince(start)
         guard elapsed >= 3600 else { return }
 
@@ -126,26 +133,30 @@ class Workout: ObservableObject {
         // Nudge: slow the treadmill to 1.5 km/h to encourage stopping
         onSpeedNudge?(15)
     }
-    
+
     /// Zeroes daily counters if the date has changed since the last update.
+    /// A session still running across midnight is closed first so it isn't lost.
     public func resetIfDateChanged() {
-        if !Calendar.current.isDateInToday(self.lastUpdateTime) {
-            self.currentSessionStart = nil
-            self.currentSessionSteps = 0
-            self.currentSessionDistance = 0
-            self.consecutiveZeroStepUpdates = 0
-            self.hasNotifiedForCurrentSession = false
-            self.lastUpdateTime = Date()
-            DispatchQueue.main.async {
-                self.distance = 0
-                self.steps = 0
-                self.walkingSeconds = 0
-                self.todaySessions = []
-                self.todayTotalDistance = 0
-            }
+        guard !Calendar.current.isDateInToday(self.lastUpdateTime) else { return }
+
+        if let event = tracker.finishNow() {
+            appLog("SESSION END: day rolled over")
+            handle([event])
+        }
+        self.hasNotifiedForCurrentSession = false
+        self.lastUpdateTime = Date()
+        DispatchQueue.main.async {
+            self.distance = 0
+            self.steps = 0
+            self.walkingSeconds = 0
+            self.todaySessions = []
+            self.todayTotalDistance = 0
+            self.recentSession = nil
+            self.recentSessionEndedAt = nil
+            self.finishDayState = .none
         }
     }
-    
+
     /// Processes a BLE state update by computing diffs and accumulating daily totals.
     /// Guards against negative diffs (treadmill reset) and initial reconnection state.
     /// @Published mutations are deferred to the next main run loop iteration to avoid
@@ -161,10 +172,17 @@ class Workout: ObservableObject {
         let distanceDiff = newState.distance - oldState.distance
         let walkingTimeDiff = newState.walkingTimeSeconds - oldState.walkingTimeSeconds
 
+        let events = tracker.ingest(
+            previous: SessionTracker.Sample(time: oldState.time, speed: oldState.speed, steps: oldState.steps, distance: oldState.distance),
+            current: SessionTracker.Sample(time: newState.time, speed: newState.speed, steps: newState.steps, distance: newState.distance)
+        )
+
         // Guard against negative diffs (treadmill counter reset)
         if stepDiff < 0 || distanceDiff < 0 {
+            handle(events)
             return
         }
+
         // Speed changes are the natural save point, but a steady walk produces none
         // for as long as it lasts — so also save on a timer while one is running.
         if oldState.speed != newState.speed || Date().timeIntervalSince(lastSaveTime) >= maxSaveInterval {
@@ -172,89 +190,86 @@ class Workout: ObservableObject {
             save()
         }
 
-        appLog("adding steps=\(stepDiff) distance=\(distanceDiff)")
+        appLog("adding steps=\(stepDiff) distance=\(distanceDiff) speed=\(newState.speed) phase=\(tracker.phase)")
 
-        // Session tracking (non-published state, safe to update synchronously)
-        let wasWalking = oldState.speed > 0
-        let isWalking = newState.speed > 0
-
-        if isWalking && !wasWalking && self.currentSessionStart == nil {
-            appLog("SESSION START: speed \(oldState.speed) → \(newState.speed)")
-            self.currentSessionStart = newState.time
-            self.currentSessionSteps = 0
-            self.currentSessionDistance = 0
-            self.consecutiveZeroStepUpdates = 0
-            self.hasNotifiedForCurrentSession = false
-            DispatchQueue.main.async {
-                self.idleProgress = 0
-                self.isStopping = false
-                self.sessionSaveState = .none
-            }
-        }
-
-        // Also start a session if we're getting steps but no session is active
-        // (happens when treadmill was already moving on first valid state pair)
-        if isWalking && stepDiff > 0 && self.currentSessionStart == nil {
-            appLog("SESSION START (mid-walk): speed=\(newState.speed), steps already flowing")
-            self.currentSessionStart = newState.time
-            self.currentSessionSteps = 0
-            self.currentSessionDistance = 0
-            self.consecutiveZeroStepUpdates = 0
-            self.hasNotifiedForCurrentSession = false
-        }
-
-        if self.currentSessionStart != nil {
-            self.currentSessionSteps += stepDiff
-            self.currentSessionDistance += distanceDiff
-
-            // Check if we need to send the 60-minute notification
+        if tracker.isActive {
             sendWalkingDurationNotificationIfNeeded()
-
-            // Track consecutive zero-step updates to detect belt stop.
-            // Only start counting after we've seen at least one step in this session
-            // to avoid false idle on session start.
-            if stepDiff == 0 && self.currentSessionSteps > 0 {
-                self.consecutiveZeroStepUpdates += 1
-                appLog("SESSION IDLE: \(self.consecutiveZeroStepUpdates)/\(self.zeroStepThreshold) zero-step updates, speed=\(newState.speed)")
-            } else {
-                self.consecutiveZeroStepUpdates = 0
-            }
-            // Update idle progress for UI
-            DispatchQueue.main.async {
-                self.idleProgress = self.consecutiveZeroStepUpdates
-            }
         }
 
-        // End session when: explicit speed→0 transition, OR belt appears stopped
-        // (several consecutive updates with no steps while session is active)
-        let beltStopped = self.currentSessionStart != nil && self.consecutiveZeroStepUpdates >= self.zeroStepThreshold
-        var completedSession: SessionSaveData? = nil
+        // Defer @Published mutations to avoid SwiftUI re-entrancy warnings
+        DispatchQueue.main.async {
+            self.steps = self.steps + stepDiff
+            self.distance = self.distance + distanceDiff
+            self.walkingSeconds = self.walkingSeconds + max(0, walkingTimeDiff)
+            self.lastUpdateTime = newState.time
+        }
 
-        if (wasWalking && !isWalking || beltStopped), let sessionStart = self.currentSessionStart {
-            appLog("SESSION END: speed \(oldState.speed) → \(newState.speed), steps=\(self.currentSessionSteps), dist=\(self.currentSessionDistance), reason=\(beltStopped ? "idle" : "speed→0")")
-            completedSession = SessionSaveData(
-                startTime: sessionStart,
-                endTime: newState.time,
-                steps: self.currentSessionSteps,
-                distance: self.currentSessionDistance
-            )
-            self.currentSessionStart = nil
-            self.currentSessionSteps = 0
-            self.currentSessionDistance = 0
-            self.consecutiveZeroStepUpdates = 0
-            self.hasNotifiedForCurrentSession = false
+        handle(events)
+    }
+
+    /// Advances session timing without a treadmill frame. Called every second so a
+    /// session still pauses and ends when the treadmill goes quiet.
+    public func tick(now: Date = Date()) {
+        let events = tracker.tick(now: now)
+        if !events.isEmpty {
+            handle(events)
+        }
+        if let endedAt = recentSessionEndedAt, now.timeIntervalSince(endedAt) > recentSessionLifetime {
+            dismissRecentSession()
+        }
+    }
+
+    /// The user tapped Stop. The session ends as soon as the belt confirms.
+    public func requestStop() {
+        tracker.requestStop(at: Date())
+        publishSessionState()
+    }
+
+    /// Clears the "Session saved" state once it has been seen.
+    public func dismissRecentSession() {
+        guard recentSession != nil || recentSessionEndedAt != nil else { return }
+        DispatchQueue.main.async {
+            self.recentSession = nil
+            self.recentSessionEndedAt = nil
+            if self.finishDayState != .posting {
+                self.finishDayState = .none
+            }
+            self.onSessionStateChange?()
+        }
+    }
+
+    /// Applies tracker events: logging, checkpointing, and completing sessions.
+    private func handle(_ events: [SessionTracker.Event]) {
+        var completed: SessionSaveData? = nil
+
+        for event in events {
+            switch event {
+            case .started(let start):
+                appLog("SESSION START at \(start)")
+                hasNotifiedForCurrentSession = false
+            case .paused:
+                appLog("SESSION PAUSED: no steps for \(Int(tracker.config.pauseAfter))s or belt reported speed 0")
+            case .resumed:
+                appLog("SESSION RESUMED")
+            case .ended(let session):
+                appLog("SESSION END: steps=\(session.steps), dist=\(session.distance), \(session.start) → \(session.end)")
+                completed = SessionSaveData(startTime: session.start, endTime: session.end, steps: session.steps, distance: session.distance)
+                hasNotifiedForCurrentSession = false
+            case .discarded:
+                appLog("SESSION DISCARDED: belt ran without any steps")
+            }
         }
 
         // Mirror the in-flight session to disk on every update, and clear it the
         // moment one ends. `todaySessions` only gains a session at the end, so
         // without this an app death mid-walk keeps the distance in the daily total
         // but loses the session — and Notion and Strava are both fed from sessions.
-        if let sessionStart = self.currentSessionStart {
+        if let start = tracker.start, let lastActivity = tracker.lastActivity {
             SessionCheckpoint(
-                startTime: sessionStart,
-                lastUpdate: newState.time,
-                steps: self.currentSessionSteps,
-                distance: self.currentSessionDistance
+                startTime: start,
+                lastUpdate: lastActivity,
+                steps: tracker.steps,
+                distance: tracker.distance
             ).save()
             hasCheckpoint = true
         } else if hasCheckpoint {
@@ -262,57 +277,49 @@ class Workout: ObservableObject {
             hasCheckpoint = false
         }
 
-        // Safety: if the user tapped Stop but no session was active, there is no
-        // session-complete path to clear the stopping state — clear it once the
-        // treadmill reports it has stopped so the UI doesn't get stuck.
-        if !isWalking && self.currentSessionStart == nil {
-            DispatchQueue.main.async {
-                if self.isStopping && self.sessionSaveState == .none {
-                    self.isStopping = false
-                    self.idleProgress = 0
-                }
-            }
-        }
+        publishSessionState()
 
-        // Defer @Published mutations to avoid SwiftUI re-entrancy warnings
+        guard let session = completed else { return }
         DispatchQueue.main.async {
-            self.steps = self.steps + stepDiff
-            self.distance = self.distance + distanceDiff
-            self.walkingSeconds = self.walkingSeconds + walkingTimeDiff
-            self.lastUpdateTime = newState.time
-
-            // Update current session published values
-            self.sessionSteps = self.currentSessionSteps
-            self.sessionDistance = self.currentSessionDistance
-
-            if let session = completedSession {
-                self.idleProgress = 0
-                self.isStopping = false
-                self.sessionSaveState = .saving
-                appLog("SESSION COMPLETE: appending session #\(self.todaySessions.count + 1), steps=\(session.steps), dist=\(session.distance)")
-                self.todaySessions.append(session)
-                self.sessionSteps = 0
-                self.sessionDistance = 0
-                self.save()
-                self.onSessionComplete?(session, self.todaySessions.count)
-                // Show "complete" after a short delay, then clear — unless
-                // stopAndFinishDay takes over and drives its own states
-                DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
-                    if self.sessionSaveState == .saving {
-                        self.sessionSaveState = .complete
-                    }
-                }
-                DispatchQueue.main.asyncAfter(deadline: .now() + 5.0) {
-                    if self.sessionSaveState == .complete {
-                        self.sessionSaveState = .none
-                    }
-                }
-            }
+            appLog("SESSION COMPLETE: appending session #\(self.todaySessions.count + 1), steps=\(session.steps), dist=\(session.distance)")
+            self.todaySessions.append(session)
+            self.recentSession = session
+            self.recentSessionEndedAt = Date()
+            self.finishDayState = .none
+            self.save()
+            self.onSessionComplete?(session, self.todaySessions.count)
+            self.onSessionStateChange?()
         }
-
     }
-    
-    
+
+    /// Mirrors the tracker's state into the published properties the UI reads.
+    private func publishSessionState() {
+        let start = tracker.start
+        let phase = tracker.phase
+        let deadline = tracker.pauseDeadline
+        let steps = tracker.steps
+        let distance = tracker.distance
+        DispatchQueue.main.async {
+            if self.sessionStart != start { self.sessionStart = start }
+            if self.sessionPhase != phase { self.sessionPhase = phase }
+            if self.pauseDeadline != deadline { self.pauseDeadline = deadline }
+            self.sessionSteps = steps
+            self.sessionDistance = distance
+            if start != nil && self.recentSession != nil {
+                // Walking again replaces the "Session saved" state.
+                self.recentSession = nil
+                self.recentSessionEndedAt = nil
+            }
+            self.onSessionStateChange?()
+        }
+    }
+
+    /// Today's distance in meters: Notion is the source of truth once sessions
+    /// have synced, but local accumulation covers unsynced walking.
+    public var todayDistance: Int {
+        max(todayTotalDistance, distance)
+    }
+
     /// Persists the current day's workout data to workouts.json.
     /// Replaces today's entry in the history and writes the full array.
     public func save() {

@@ -1,160 +1,120 @@
 import SwiftUI
+import AppKit
 
-/// Bottom bar with Stats and Quit buttons, pinned to the bottom of the popover.
+/// Posts today's walks to Strava as one activity. Used by "Done for today" and the
+/// footer's "Post to Strava" chip. Progress lands in `workout.finishDayState`.
+enum StravaDayPoster {
+    static func postToday(workout: Workout) {
+        let notion = NotionService.shared
+        let strava = StravaService.shared
+        strava.clearUploadResult()
+        workout.finishDayState = .posting
+
+        Task {
+            // In-memory sessions always include the one that just ended; Notion adds
+            // any from before an app restart.
+            let local = await MainActor.run { workout.todaySessions }
+            let remote = await notion.fetchTodaySessions() ?? []
+            let sessions = mergeSessions(local: local, remote: remote)
+
+            let success: Bool
+            if sessions.isEmpty {
+                ActivityLog.shared.error("No sessions found for today")
+                success = false
+            } else {
+                success = await strava.postTodayActivity(sessions: sessions, notionService: notion)
+            }
+            ActivityLog.shared.info("Done for today: \(success ? "posted" : "failed")")
+            await MainActor.run {
+                workout.finishDayState = success ? .posted : .failed
+            }
+        }
+    }
+
+    /// Merges local in-memory sessions with Notion sessions, deduplicating by start time.
+    static func mergeSessions(local: [SessionSaveData], remote: [SessionSaveData]) -> [SessionSaveData] {
+        if local.isEmpty { return remote }
+        if remote.isEmpty { return local }
+
+        var merged = local
+        for remoteSession in remote {
+            let isDuplicate = local.contains { abs($0.startTime.timeIntervalSince(remoteSession.startTime)) < 60 }
+            if !isDuplicate {
+                merged.append(remoteSession)
+            }
+        }
+        return merged.sorted { $0.startTime < $1.startTime }
+    }
+}
+
+/// Bottom row of the idle states: Stats, and Strava only when there's something to do.
+/// Updates and Quit live in the native menu items below the popover.
 struct FooterView: View {
     @EnvironmentObject var walkingPadService: WalkingPadService
     @EnvironmentObject var workout: Workout
+    @ObservedObject private var strava = StravaService.shared
 
-    @State private var showUploadConfirm: Bool = false
+    /// First tap arms the post, second tap sends it — a Strava activity is public.
+    @State private var confirmPost = false
 
     /// Singleton reference to prevent duplicate stats windows.
     private static var statsWindow: NSWindow?
 
-    private var stravaService: StravaService { StravaService.shared }
-    private var notionService: NotionService { NotionService.shared }
-
     var body: some View {
-        VStack(spacing: 4) {
-            if showUploadConfirm {
-                HStack(spacing: 6) {
-                    Text("Upload to Strava?")
-                        .font(.caption2)
-                        .foregroundStyle(.secondary)
-                    Spacer()
-                    Button(action: { showUploadConfirm = false }) {
-                        Text("Cancel")
-                            .font(.caption2.weight(.medium))
-                            .contentShape(Capsule())
-                    }
-                    .buttonStyle(.plain)
-                    .padding(.horizontal, 8)
-                    .padding(.vertical, 3)
-                    .background(.ultraThinMaterial, in: .capsule)
-
-                    Button(action: {
-                        showUploadConfirm = false
-                        postToStrava()
-                    }) {
-                        Text("Upload")
-                            .font(.caption2.weight(.medium))
-                            .foregroundStyle(.orange)
-                            .contentShape(Capsule())
-                    }
-                    .buttonStyle(.plain)
-                    .padding(.horizontal, 8)
-                    .padding(.vertical, 3)
-                    .background(.orange.opacity(0.1), in: .capsule)
-                }
+        HStack(spacing: 6) {
+            Button(action: { FooterView.openStatsWindow(workout: workout, walkingPadService: walkingPadService) }) {
+                Label("Stats", systemImage: "chart.bar.xaxis")
+                    .font(.caption.weight(.medium))
             }
+            .buttonStyle(.glass)
 
-            HStack(spacing: 6) {
-                Button(action: { openStatsWindow() }) {
-                    Label("Stats", systemImage: "chart.bar")
-                        .font(.caption2.weight(.medium))
-                        .contentShape(Capsule())
-                }
-                .buttonStyle(.plain)
-                .padding(.horizontal, 8)
-                .padding(.vertical, 3)
-                .background(.ultraThinMaterial, in: .capsule)
+            stravaChip
 
-                stravaButton
-
-                Spacer()
-
-                Button(action: {
-                    walkingPadService.command()?.setSpeed(speed: 0)
-                    workout.save()
-                    NSApplication.shared.terminate(nil)
-                }) {
-                    Text("Quit")
-                        .font(.caption2.weight(.medium))
-                        .foregroundStyle(.secondary)
-                        .contentShape(Capsule())
-                }
-                .buttonStyle(.plain)
-                .padding(.horizontal, 8)
-                .padding(.vertical, 3)
-                .background(.ultraThinMaterial, in: .capsule)
-            }
+            Spacer(minLength: 0)
         }
     }
 
     @ViewBuilder
-    private var stravaButton: some View {
-        let strava = stravaService
-        if strava.isSyncing {
-            ProgressView()
-                .controlSize(.mini)
-                .padding(.horizontal, 6)
-        } else if !strava.isConnected {
-            Button(action: { strava.startOAuthFlow() }) {
-                Image(systemName: "figure.run")
-                    .font(.caption2)
-                    .foregroundStyle(.secondary)
-                    .contentShape(Capsule())
-            }
-            .buttonStyle(.plain)
-            .padding(.horizontal, 6)
-            .padding(.vertical, 3)
-            .background(.ultraThinMaterial, in: .capsule)
-            .help("Connect to Strava")
-        } else if strava.isSyncedToday {
-            Image(systemName: "checkmark.circle.fill")
-                .font(.caption2)
-                .foregroundStyle(.green)
-                .help("Synced to Strava today")
-        } else if strava.lastError != nil {
-            Button(action: { showUploadConfirm = true; strava.clearUploadResult() }) {
-                Image(systemName: "exclamationmark.circle")
-                    .font(.caption2)
-                    .foregroundStyle(.red)
-                    .contentShape(Capsule())
-            }
-            .buttonStyle(.plain)
-            .padding(.horizontal, 6)
-            .padding(.vertical, 3)
-            .background(.ultraThinMaterial, in: .capsule)
-            .help(strava.lastError ?? "Error")
-        } else {
-            Button(action: { showUploadConfirm = true; strava.clearUploadResult() }) {
-                Image(systemName: "square.and.arrow.up")
-                    .font(.caption2)
-                    .foregroundStyle(.orange)
-                    .contentShape(Capsule())
-            }
-            .buttonStyle(.plain)
-            .padding(.horizontal, 6)
-            .padding(.vertical, 3)
-            .background(.ultraThinMaterial, in: .capsule)
-            .help("Post today's walk to Strava")
-        }
-    }
-
-    private func postToStrava() {
-        let strava = stravaService
-        let notion = notionService
-        strava.clearUploadResult()
-        Task {
-            if let sessions = await notion.fetchTodaySessions(), !sessions.isEmpty {
-                _ = await strava.postTodayActivity(sessions: sessions, notionService: notion)
-            } else {
-                await MainActor.run {
-                    strava.uploadResultMessage = "No sessions found for today"
-                    strava.uploadResultIsError = true
+    private var stravaChip: some View {
+        if !strava.isConnected {
+            Button("Connect Strava") { strava.startOAuthFlow() }
+                .buttonStyle(.glass)
+                .font(.caption)
+                .foregroundStyle(.secondary)
+        } else if strava.isSyncing || workout.finishDayState == .posting {
+            ProgressView().controlSize(.small).padding(.horizontal, 6)
+        } else if !strava.isSyncedToday && !workout.todaySessions.isEmpty {
+            Button {
+                if confirmPost {
+                    confirmPost = false
+                    StravaDayPoster.postToday(workout: workout)
+                } else {
+                    confirmPost = true
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 4) { confirmPost = false }
+                }
+            } label: {
+                HStack(spacing: 6) {
+                    Circle().fill(strava.lastError == nil ? Color.orange : Color.red).frame(width: 6, height: 6)
+                    Text(confirmPost ? "Post \(distanceTextFor(workout.todayDistance))?" : (strava.lastError == nil ? "Post to Strava" : "Retry Strava"))
+                        .font(.caption.weight(.semibold))
                 }
             }
+            .buttonStyle(.glass)
+            .tint(.orange)
+            .help(strava.lastError ?? "Post today's walks to Strava as one activity")
         }
     }
 
-    private func openStatsWindow() {
+    // MARK: - Stats window
+
+    static func openStatsWindow(workout: Workout, walkingPadService: WalkingPadService) {
         // Close existing window so we always show fresh data
-        if let existing = FooterView.statsWindow {
+        if let existing = statsWindow {
             existing.close()
-            FooterView.statsWindow = nil
+            statsWindow = nil
         }
 
-        let notion = notionService
+        let notion = NotionService.shared
         let notionConfigured = notion.isConfigured
 
         // If Notion is configured, start empty and load from Notion only.
@@ -167,25 +127,46 @@ struct FooterView: View {
             viewModel: viewModel,
             walkingPadService: walkingPadService,
             notionService: notion,
-            stravaService: stravaService
+            stravaService: StravaService.shared
         )
+        .environmentObject(GoalSettings.shared)
+        .environmentObject(workout)
+
         let hostingView = NSHostingView(rootView: statsView)
+        hostingView.translatesAutoresizingMaskIntoConstraints = false
+
+        // Behind-window blur, so the desktop shows through the window like the
+        // system's own glass surfaces. Follows the system appearance.
+        let background = NSVisualEffectView()
+        background.material = .underWindowBackground
+        background.blendingMode = .behindWindow
+        background.state = .followsWindowActiveState
+        background.addSubview(hostingView)
+        NSLayoutConstraint.activate([
+            hostingView.leadingAnchor.constraint(equalTo: background.leadingAnchor),
+            hostingView.trailingAnchor.constraint(equalTo: background.trailingAnchor),
+            hostingView.topAnchor.constraint(equalTo: background.topAnchor),
+            hostingView.bottomAnchor.constraint(equalTo: background.bottomAnchor),
+        ])
 
         let window = NSWindow(
-            contentRect: NSRect(x: 0, y: 0, width: 560, height: 560),
-            styleMask: [.titled, .closable, .resizable, .miniaturizable],
+            contentRect: NSRect(x: 0, y: 0, width: 960, height: 820),
+            styleMask: [.titled, .closable, .resizable, .miniaturizable, .fullSizeContentView],
             backing: .buffered,
             defer: false
         )
-        window.center()
+        window.titlebarAppearsTransparent = true
+        window.titleVisibility = .hidden
         window.title = "WalkingPad Stats"
-        window.contentView = hostingView
+        window.isMovableByWindowBackground = true
+        window.contentView = background
         window.isReleasedWhenClosed = false
-        window.minSize = NSSize(width: 540, height: 480)
+        window.minSize = NSSize(width: 900, height: 720)
+        window.center()
         window.makeKeyAndOrderFront(nil)
         NSApp.activate()
 
-        FooterView.statsWindow = window
+        statsWindow = window
 
         // Fetch from Notion — only source of truth when configured
         if notionConfigured {
@@ -193,9 +174,6 @@ struct FooterView: View {
                 if let sessions = await notion.fetchAllSessions() {
                     let workouts = NotionService.groupSessionsByDate(sessions)
                     appLog("Stats: replacing with \(workouts.count) days from Notion (\(sessions.count) sessions)")
-                    for w in workouts {
-                        appLog("  Day: \(w.date), steps=\(w.steps), dist=\(w.distance), sessions=\(w.sessions?.count ?? 0)")
-                    }
                     await MainActor.run {
                         viewModel.replaceWorkouts(workouts, source: "Notion")
                     }
@@ -208,11 +186,5 @@ struct FooterView: View {
                 }
             }
         }
-    }
-}
-
-struct FooterView_Previews: PreviewProvider {
-    static var previews: some View {
-        FooterView()
     }
 }

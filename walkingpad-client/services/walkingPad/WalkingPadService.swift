@@ -180,6 +180,11 @@ open class WalkingPadService: NSObject, CBPeripheralDelegate, ObservableObject {
             let type = statusType == .currentStatus ? "curr" : "last"
             log("\(type) spd=\(speed) steps=\(steps) dist=\(distance) time=\(walkingTimeSeconds)s mode=\(isManualMode ? "M" : "A")")
 
+            // A "last session" summary carries the previous run's counters, not the
+            // belt's live ones. Diffing a live frame against it produces phantom
+            // steps or a fake counter reset, so only live frames move state.
+            guard statusType == .currentStatus else { return }
+
             let status = DeviceState(
                 time: Date(),
                 walkingTimeSeconds: walkingTimeSeconds,

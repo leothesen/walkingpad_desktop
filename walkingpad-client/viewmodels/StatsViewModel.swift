@@ -2,18 +2,16 @@ import Foundation
 import SwiftUI
 
 enum TimeRange: String, CaseIterable {
-    case week = "7 Days"
-    case month = "30 Days"
-    case monthly = "Monthly"
-    case yearly = "Yearly"
-    case allTime = "All Time"
+    case week = "Week"
+    case month = "Month"
+    case year = "Year"
 }
 
 /// How chart points are bucketed for the selected range.
 enum ChartGranularity {
-    case day    // one bar per day (7 Days, 30 Days)
-    case month  // one bar per month (Monthly, All Time)
-    case year   // one bar per year (Yearly)
+    case day    // one bar per day (Week, Month)
+    case month  // one bar per month (Year)
+    case year   // one bar per year
 }
 
 /// A single data point for the trend chart and daily breakdowns.
@@ -51,8 +49,7 @@ class StatsViewModel: ObservableObject {
     var granularity: ChartGranularity {
         switch selectedRange {
         case .week, .month: return .day
-        case .monthly, .allTime: return .month
-        case .yearly: return .year
+        case .year: return .month
         }
     }
 
@@ -68,13 +65,11 @@ class StatsViewModel: ObservableObject {
         case .month:
             let cutoff = calendar.date(byAdding: .day, value: -30, to: now)!
             return allWorkouts.filter { $0.date >= cutoff }
-        case .monthly:
+        case .year:
             // Last 12 calendar months including the current one
             let startOfMonth = calendar.dateInterval(of: .month, for: now)!.start
             let cutoff = calendar.date(byAdding: .month, value: -11, to: startOfMonth)!
             return allWorkouts.filter { $0.date >= cutoff }
-        case .yearly, .allTime:
-            return allWorkouts
         }
     }
 
@@ -92,13 +87,11 @@ class StatsViewModel: ObservableObject {
             let start = calendar.date(byAdding: .day, value: -60, to: now)!
             let end = calendar.date(byAdding: .day, value: -30, to: now)!
             return allWorkouts.filter { $0.date >= start && $0.date < end }
-        case .monthly:
+        case .year:
             let startOfMonth = calendar.dateInterval(of: .month, for: now)!.start
             let end = calendar.date(byAdding: .month, value: -11, to: startOfMonth)!
             let start = calendar.date(byAdding: .month, value: -12, to: end)!
             return allWorkouts.filter { $0.date >= start && $0.date < end }
-        case .yearly, .allTime:
-            return nil
         }
     }
 
@@ -137,8 +130,7 @@ class StatsViewModel: ObservableObject {
         switch selectedRange {
         case .week: return "vs previous 7 days"
         case .month: return "vs previous 30 days"
-        case .monthly: return "vs previous 12 months"
-        case .yearly, .allTime: return ""
+        case .year: return "vs previous 12 months"
         }
     }
 
@@ -158,10 +150,12 @@ class StatsViewModel: ObservableObject {
     /// Consecutive active days ending today (or yesterday, if today has no
     /// activity yet — an in-progress day shouldn't read as a broken streak).
     /// Computed over all data, independent of the selected range.
-    var currentStreak: Int {
+    var currentStreak: Int { Self.currentStreak(in: allWorkouts) }
+
+    static func currentStreak(in workouts: [WorkoutSaveData]) -> Int {
         let calendar = Calendar.current
         let activeDaySet = Set(
-            allWorkouts.filter { $0.steps > 0 }.map { calendar.startOfDay(for: $0.date) }
+            workouts.filter { $0.steps > 0 }.map { calendar.startOfDay(for: $0.date) }
         )
         guard !activeDaySet.isEmpty else { return 0 }
 
@@ -289,10 +283,61 @@ class StatsViewModel: ObservableObject {
         switch selectedRange {
         case .week: return 7
         case .month: return 30
-        case .monthly: return 365
-        case .yearly, .allTime:
-            guard let first = allWorkouts.map(\.date).min() else { return 0 }
-            return max(1, (Calendar.current.dateComponents([.day], from: first, to: Date()).day ?? 0) + 1)
+        case .year: return 365
         }
+    }
+
+    // MARK: - Goal & history
+
+    /// Longest run of consecutive active days in all data.
+    var longestStreak: Int {
+        let calendar = Calendar.current
+        let days = Set(allWorkouts.filter { $0.steps > 0 }.map { calendar.startOfDay(for: $0.date) }).sorted()
+        var longest = 0
+        var run = 0
+        var previous: Date?
+        for day in days {
+            if let previous, calendar.date(byAdding: .day, value: 1, to: previous) == day {
+                run += 1
+            } else {
+                run = 1
+            }
+            longest = max(longest, run)
+            previous = day
+        }
+        return longest
+    }
+
+    /// Days in the selected period that met the goal.
+    func goalDays(goal: GoalSettings) -> Int {
+        filteredWorkouts.filter {
+            goal.progress(distanceMeters: $0.distance, steps: $0.steps, seconds: $0.walkingSeconds) >= 1
+        }.count
+    }
+
+    /// The longest single session in the selected period, in seconds.
+    var longestSessionSeconds: TimeInterval? {
+        filteredWorkouts
+            .flatMap { $0.sessions ?? [] }
+            .map { $0.endTime.timeIntervalSince($0.startTime) }
+            .max()
+    }
+
+    /// One entry per calendar day (merging duplicates), keyed by start of day.
+    var workoutsByDay: [Date: WorkoutSaveData] {
+        let calendar = Calendar.current
+        var byDay: [Date: WorkoutSaveData] = [:]
+        for w in allWorkouts {
+            let day = calendar.startOfDay(for: w.date)
+            if var existing = byDay[day] {
+                existing.distance += w.distance
+                existing.steps += w.steps
+                existing.walkingSeconds += w.walkingSeconds
+                byDay[day] = existing
+            } else {
+                byDay[day] = w
+            }
+        }
+        return byDay
     }
 }
