@@ -47,8 +47,7 @@ enum StravaDayPoster {
     }
 }
 
-/// Bottom row of the idle states: Stats, and Strava only when there's something to do.
-/// Quit is also on the status item's right-click menu.
+/// Bottom row of the idle states: Stats, Quit, and Strava only when there's something to do.
 struct FooterView: View {
     @EnvironmentObject var walkingPadService: WalkingPadService
     @EnvironmentObject var workout: Workout
