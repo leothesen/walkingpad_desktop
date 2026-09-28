@@ -3,16 +3,41 @@ import UserNotifications
 import Sparkle
 import Combine
 
-/// Main app entry point. Uses a Settings scene with an empty view since this is a
-/// menu-bar-only app (LSUIElement = true in Info.plist hides it from the Dock).
-/// All real setup happens in AppDelegate.
+/// Main app entry point: a menu-bar-only app (LSUIElement = true in Info.plist hides
+/// it from the Dock). The popover is SwiftUI's native MenuBarExtra in window style,
+/// so the system draws its glass, placement and dismissal.
+/// All service setup happens in AppDelegate.
 @main
 struct MenuBarPopoverApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
     var body: some Scene {
-        Settings {
-            EmptyView()
+        MenuBarExtra {
+            ContentView()
+                .environmentObject(appDelegate.workout)
+                .environmentObject(appDelegate.walkingPadService)
+                .environmentObject(GoalSettings.shared)
+                .onAppear { appDelegate.popoverDidShow() }
+                .onDisappear { appDelegate.popoverDidClose() }
+        } label: {
+            StatusBarLabel(model: appDelegate.statusBar)
         }
+        .menuBarExtraStyle(.window)
+    }
+}
+
+/// What the menu bar item shows: the goal ring and one piece of text.
+final class StatusBarModel: ObservableObject {
+    @Published var image = NSImage()
+    @Published var title = ""
+}
+
+struct StatusBarLabel: View {
+    @ObservedObject var model: StatusBarModel
+
+    var body: some View {
+        Image(nsImage: model.image)
+        // Monospaced digits keep the item width stable while the timer ticks
+        Text(model.title).monospacedDigit()
     }
 }
 
@@ -24,8 +49,8 @@ struct MenuBarPopoverApp: App {
 /// - Manages the status bar item and popover UI
 /// - Handles sleep/wake notifications to pause and resume services
 class AppDelegate: NSObject, NSApplicationDelegate {
-    private var workout = Workout()
-    private var walkingPadService: WalkingPadService
+    private(set) var workout = Workout()
+    private(set) var walkingPadService: WalkingPadService
     private var bluetoothDiscoverService: BluetoothDiscoveryService
     private var updateTimer: RepeatingTimer? = nil;
     private var mqttService: MqttService
@@ -34,14 +59,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
     static let updaterController = SPUStandardUpdaterController(startingUpdater: false, updaterDelegate: nil, userDriverDelegate: nil)
 
-    var statusBarItem: NSStatusItem!
-    private var popover: GlassPanel!
-    private var popoverContent: NSViewController!
-    private var popoverSizeObservation: NSKeyValueObservation?
-    /// Closes the popover on a click in another app (clicks in ours resign key instead).
-    private var clickOutsideMonitor: Any?
-    /// Right-click menu on the status item (Quit).
-    private var contextMenu: NSMenu!
+    let statusBar = StatusBarModel()
     private var goalObserver: AnyCancellable?
 
     static func checkForUpdates() {
@@ -189,58 +207,6 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             startHttpServer(walkingPadService: self.walkingPadService, workout: self.workout)
         }
 
-        // The popover is a borderless panel on clear Liquid Glass, dropping down from
-        // the status item like Control Center. NSPopover's own glass is heavily
-        // frosted and can't be replaced; this matches the stats window instead.
-        // The controls inside use regular glass, so they read as a slightly more
-        // opaque layer on top. Width is fixed by ContentView; preferredContentSize
-        // lets the height follow the content, which differs per state.
-        let hostingController = NSHostingController(rootView: ContentView()
-                                    .environmentObject(workout)
-                                    .environmentObject(walkingPadService)
-                                    .environmentObject(GoalSettings.shared))
-        hostingController.sizingOptions = [.preferredContentSize]
-        self.popoverContent = hostingController
-
-        let glass = NSGlassEffectView()
-        glass.style = .clear
-        glass.cornerRadius = 24
-        glass.contentView = hostingController.view
-
-        self.popover = GlassPanel(contentRect: .zero, styleMask: [.borderless, .nonactivatingPanel], backing: .buffered, defer: true)
-        popover.contentView = glass
-        popover.isOpaque = false
-        popover.backgroundColor = .clear
-        popover.hasShadow = true
-        popover.level = .popUpMenu
-        popover.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary, .transient, .ignoresCycle]
-        popover.hidesOnDeactivate = false
-        popover.isReleasedWhenClosed = false
-        popover.onCancel = { [weak self] in self?.closePopover() }
-        NotificationCenter.default.addObserver(self, selector: #selector(popoverDidResignKey), name: NSWindow.didResignKeyNotification, object: popover)
-
-        // Grow and shrink downward from the menu bar as the state changes.
-        popoverSizeObservation = hostingController.observe(\.preferredContentSize) { [weak self] _, _ in
-            DispatchQueue.main.async {
-                guard let self = self, self.popover.isVisible else { return }
-                self.positionPopover()
-            }
-        }
-
-        self.contextMenu = NSMenu()
-        let quitItem = NSMenuItem(title: "Quit WalkingPad", action: #selector(quitFromMenu), keyEquivalent: "q")
-        quitItem.target = self
-        contextMenu.addItem(quitItem)
-
-        self.statusBarItem = NSStatusBar.system.statusItem(withLength: CGFloat(NSStatusItem.variableLength))
-        if let button = self.statusBarItem.button {
-            button.imagePosition = .imageLeading
-            // Monospaced digits keep the item width stable while the timer ticks
-            button.font = NSFont.monospacedDigitSystemFont(ofSize: NSFont.systemFontSize, weight: .regular)
-            button.target = self
-            button.action = #selector(statusItemClicked(_:))
-            button.sendAction(on: [.leftMouseUp, .rightMouseUp])
-        }
         updateStatusBarTitle()
 
         // Every second: advance session timing (so a quiet treadmill still pauses
@@ -290,11 +256,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         self.walkingPadService.command()?.updateStatus()
     }
 
-    @objc private func quitFromMenu() {
-        AppDelegate.quit(walkingPadService: walkingPadService, workout: workout)
-    }
-
-    /// Stops the belt, saves, and quits. Shared by the right-click menu and the popover.
+    /// Stops the belt, saves, and quits. Used by the popover's Quit button.
     static func quit(walkingPadService: WalkingPadService, workout: Workout) {
         walkingPadService.command()?.setSpeed(speed: 0)
         workout.save()
@@ -303,81 +265,19 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
     // MARK: - Popover
 
-    /// Left click toggles the popover; right click (or control-click) shows Quit.
-    @objc private func statusItemClicked(_ sender: NSStatusBarButton) {
-        let event = NSApp.currentEvent
-        let isContextClick = event?.type == .rightMouseUp || event?.modifierFlags.contains(.control) == true
-        if isContextClick {
-            closePopover()
-            statusBarItem.menu = contextMenu
-            sender.performClick(nil)
-            statusBarItem.menu = nil
-            return
-        }
-
-        if popover.isVisible {
-            closePopover()
-        } else {
-            showPopover()
-        }
-    }
-
     /// Whether a just-ended session was on screen while the popover was open.
     private var recentSessionWasShown = false
 
-    private func showPopover() {
+    func popoverDidShow() {
         recentSessionWasShown = workout.recentSession != nil
-        popoverContent.view.layoutSubtreeIfNeeded()
-        positionPopover()
-        statusBarItem.button?.highlight(true)
-
-        popover.alphaValue = 0
-        popover.makeKeyAndOrderFront(nil)
-        NSAnimationContext.runAnimationGroup { context in
-            context.duration = 0.12
-            popover.animator().alphaValue = 1
-        }
-
-        clickOutsideMonitor = NSEvent.addGlobalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown]) { [weak self] _ in
-            self?.closePopover()
-        }
     }
 
-    private func closePopover() {
-        guard popover.isVisible else { return }
-        if let monitor = clickOutsideMonitor {
-            NSEvent.removeMonitor(monitor)
-            clickOutsideMonitor = nil
-        }
-        statusBarItem.button?.highlight(false)
-        popover.orderOut(nil)
-
+    func popoverDidClose() {
         // "Session saved" stays until it has been seen once.
         if recentSessionWasShown {
             workout.dismissRecentSession()
         }
         recentSessionWasShown = false
-    }
-
-    /// Clicking elsewhere in the app (e.g. the stats window) closes the popover.
-    /// A click on the status item is left to statusItemClicked, which toggles it.
-    @objc private func popoverDidResignKey(_ notification: Notification) {
-        if let window = NSApp.currentEvent?.window, window === statusBarItem.button?.window { return }
-        closePopover()
-    }
-
-    /// Places the popover just under the status item, centred on it and kept on screen.
-    private func positionPopover() {
-        guard let button = statusBarItem.button, let buttonWindow = button.window else { return }
-        var size = popoverContent.preferredContentSize
-        if size == .zero { size = popoverContent.view.fittingSize }
-
-        let anchor = buttonWindow.convertToScreen(button.convert(button.bounds, to: nil))
-        let screen = (buttonWindow.screen ?? NSScreen.main)?.visibleFrame ?? anchor
-        let margin: CGFloat = 8
-        let x = min(max(anchor.midX - size.width / 2, screen.minX + margin), screen.maxX - size.width - margin)
-        let y = anchor.minY - 6 - size.height
-        popover.setFrame(NSRect(x: x, y: y, width: size.width, height: size.height), display: true)
     }
 
     // MARK: - Status bar
@@ -387,8 +287,6 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     /// - Just finished a session: "+0.42 km" for a few seconds
     /// - Otherwise: today's total
     private func updateStatusBarTitle() {
-        guard let button = self.statusBarItem?.button else { return }
-
         let goal = GoalSettings.shared
         let progress = goal.progress(distanceMeters: workout.todayDistance, steps: workout.steps, seconds: workout.walkingSeconds)
         let connected = walkingPadService.isConnected()
@@ -418,9 +316,8 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         }
 
         let image = StatusBarIcon.image(style: style, progress: progress)
-        if button.image !== image { button.image = image }
-        let spaced = title.isEmpty ? "" : " " + title
-        if button.title != spaced { button.title = spaced }
+        if statusBar.image !== image { statusBar.image = image }
+        if statusBar.title != title { statusBar.title = title }
     }
 
     /// "2.7 km" / "640 m" — one decimal keeps the menu bar item narrow.
@@ -429,14 +326,3 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     }
 }
 
-/// Borderless, non-activating panel for the menu bar popover. It can take key so
-/// its controls respond on the first click, and Escape closes it.
-final class GlassPanel: NSPanel {
-    var onCancel: (() -> Void)?
-
-    override var canBecomeKey: Bool { true }
-
-    override func cancelOperation(_ sender: Any?) {
-        onCancel?()
-    }
-}
