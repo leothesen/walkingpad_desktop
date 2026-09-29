@@ -81,6 +81,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         self.updateTimer = RepeatingTimer(interval: 5, eventHandler: {
             self.workout.resetIfDateChanged()
             self.stravaService.resetIfDateChanged()
+            self.stravaService.checkUnsyncedDaysIfDayChanged(notionService: self.notionService)
             self.walkingPadService.command()?.updateStatus()
         })
 
@@ -177,12 +178,8 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         self.workout.resetIfDateChanged()
         self.stravaService.resetIfDateChanged()
 
-        // Re-check if yesterday's sessions need syncing (relevant after overnight sleep)
-        Task {
-            if self.notionService.isConfigured {
-                await self.stravaService.checkYesterdaySync(notionService: self.notionService)
-            }
-        }
+        // Re-check for days that never reached Strava (relevant after overnight sleep)
+        self.stravaService.checkUnsyncedDays(notionService: self.notionService, force: true)
     }
 
     /// Records that this run ended on purpose. Without it every quit looks identical
@@ -234,7 +231,9 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                         self.updateStatusBarTitle()
                     }
                 }
-                await self.stravaService.checkYesterdaySync(notionService: self.notionService)
+                await MainActor.run {
+                    self.stravaService.checkUnsyncedDays(notionService: self.notionService, force: true)
+                }
 
                 // Fetch all sessions from Notion to populate the widget with the last 7 days
                 if let allSessions = await self.notionService.fetchAllSessions() {
@@ -270,6 +269,8 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
     func popoverDidShow() {
         recentSessionWasShown = workout.recentSession != nil
+        // Throttled inside, so opening the popover often costs nothing.
+        stravaService.checkUnsyncedDays(notionService: notionService)
     }
 
     func popoverDidClose() {

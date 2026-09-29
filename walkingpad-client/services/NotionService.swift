@@ -19,6 +19,13 @@ class NotionService: ObservableObject {
 
     private static let saTimeZone = TimeZone(identifier: "Africa/Johannesburg")!
 
+    /// Calendar in the time zone Notion day keys use, for stepping between days.
+    static let dayCalendar: Calendar = {
+        var c = Calendar(identifier: .gregorian)
+        c.timeZone = saTimeZone
+        return c
+    }()
+
     private static let dateFormatter: DateFormatter = {
         let f = DateFormatter()
         f.dateFormat = "yyyy-MM-dd"
@@ -453,6 +460,91 @@ class NotionService: ObservableObject {
     func isStravaPosted(for date: Date) async -> Bool {
         guard let result = await fetchDayTotal(for: date) else { return false }
         return result.stravaPosted
+    }
+
+    /// The Notion "Date" key ("yyyy-MM-dd", South African time) a moment falls on.
+    static func dayKey(for date: Date) -> String {
+        dateFormatter.string(from: date)
+    }
+
+    /// Midnight (South African time) of a day key.
+    static func date(forDayKey key: String) -> Date? {
+        dateFormatter.date(from: key)
+    }
+
+    /// Sessions between two days (inclusive), grouped by day key. One query for the
+    /// whole range instead of one per day. Nil if the query fails.
+    func fetchSessionsByDay(from start: Date, to end: Date) async -> [String: [SessionSaveData]]? {
+        guard let databaseId = databaseId else { return nil }
+        guard let pages = await queryRange(databaseId: databaseId, from: start, to: end) else { return nil }
+
+        var byDay: [String: [SessionSaveData]] = [:]
+        for page in pages {
+            guard let session = parseSession(from: page) else { continue }
+            byDay[Self.dayKey(for: session.startTime), default: []].append(session)
+        }
+        return byDay
+    }
+
+    /// Day keys between two days (inclusive) whose Day Totals entry records a Strava
+    /// post. Nil if the query fails.
+    func fetchStravaPostedDays(from start: Date, to end: Date) async -> Set<String>? {
+        guard let pages = await queryRange(databaseId: dayTotalsDatabaseId, from: start, to: end) else { return nil }
+
+        var posted = Set<String>()
+        for page in pages {
+            let props = page["properties"] as? [String: Any] ?? [:]
+            guard !extractRichText(props["Strava Posted At"]).isEmpty,
+                  let dateProp = props["Date"] as? [String: Any],
+                  let dateObj = dateProp["date"] as? [String: Any],
+                  let dateStr = dateObj["start"] as? String else { continue }
+            posted.insert(String(dateStr.prefix(10)))
+        }
+        return posted
+    }
+
+    /// Non-archived pages of a database whose "Date" falls between two days (inclusive).
+    private func queryRange(databaseId: String, from start: Date, to end: Date) async -> [[String: Any]]? {
+        guard let apiKey = apiKey else { return nil }
+
+        var pages: [[String: Any]] = []
+        var cursor: String? = nil
+        repeat {
+            var body: [String: Any] = [
+                "page_size": 100,
+                "filter": ["and": [
+                    ["property": "Date", "date": ["on_or_after": Self.dayKey(for: start)]],
+                    ["property": "Date", "date": ["on_or_before": Self.dayKey(for: end)]]
+                ]]
+            ]
+            if let cursor = cursor { body["start_cursor"] = cursor }
+
+            do {
+                var request = URLRequest(url: URL(string: "\(baseURL)/databases/\(databaseId)/query")!)
+                request.httpMethod = "POST"
+                request.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
+                request.setValue(notionVersion, forHTTPHeaderField: "Notion-Version")
+                request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+                request.httpBody = try JSONSerialization.data(withJSONObject: body)
+
+                let (data, response) = try await session.data(for: request)
+                guard (response as? HTTPURLResponse)?.statusCode == 200,
+                      let json = try JSONSerialization.jsonObject(with: data) as? [String: Any],
+                      let results = json["results"] as? [[String: Any]] else {
+                    appLog("Notion: range query failed (\((response as? HTTPURLResponse)?.statusCode ?? -1))")
+                    return nil
+                }
+
+                pages += results.filter {
+                    !($0["archived"] as? Bool ?? false) && !($0["in_trash"] as? Bool ?? false)
+                }
+                cursor = (json["has_more"] as? Bool ?? false) ? json["next_cursor"] as? String : nil
+            } catch {
+                appLog("Notion: range query error: \(error)")
+                return nil
+            }
+        } while cursor != nil
+        return pages
     }
 
     /// Fetches the most recent Strava sync date by checking recent Day Totals entries.
