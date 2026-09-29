@@ -26,6 +26,7 @@ BLE Notify (FE01) → WalkingPadService → callback → Workout
 
 Stats window → NotionService.fetchAllSessions() → StatsViewModel → Charts
 Strava post  → NotionService.fetchTodaySessions() → StravaService → Strava API
+Missed days  → NotionService range queries (last 7 days) → StravaService.unsyncedDays → popover banner
 ```
 
 - **Entry point**: `walkingpad_clientApp.swift` — `MenuBarPopoverApp` + `AppDelegate`
@@ -93,5 +94,6 @@ Strava post  → NotionService.fetchTodaySessions() → StravaService → Strava
 - All logging uses `appLog()` (global function in ActivityLog.swift) which routes to both console and the debug panel's Log tab
 - Never count BLE frames as a proxy for time: the treadmill replies to most commands with an extra status frame, so frame bursts arrive after speed changes. Session rules are wall-clock based (see `SessionTracker`)
 - Use semantic colors (`.primary`, `.secondary`, system `.green`/`.orange`) and glass/materials so the UI follows the system light/dark appearance
+- Missed-day Strava check (`StravaService.checkUnsyncedDays`) re-runs on launch, wake, day rollover, and popover open (throttled to every 10 min) — never cache "yesterday" across midnight
 - Strava API does not support a `steps` field on activity creation — steps only appear in the description text
 - Sparkle EdDSA private key is in GitHub secret `SPARKLE_PRIVATE_KEY`; public key is in Info.plist `SUPublicEDKey`
