@@ -215,9 +215,12 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         }
         RunLoop.main.add(statusBarTimer, forMode: .common)
 
-        // Redraw when the goal changes.
+        // Redraw the menu bar and the widget when the goal changes.
         goalObserver = GoalSettings.shared.objectWillChange.sink { [weak self] _ in
-            DispatchQueue.main.async { self?.updateStatusBarTitle() }
+            DispatchQueue.main.async {
+                self?.updateStatusBarTitle()
+                self?.workout.updateWidgetData()
+            }
         }
 
         // Fetch today's total from Notion for the status bar on launch,
@@ -235,7 +238,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                     self.stravaService.checkUnsyncedDays(notionService: self.notionService, force: true)
                 }
 
-                // Fetch all sessions from Notion to populate the widget with the last 7 days
+                // Fetch all sessions from Notion to populate the widget's history
                 if let allSessions = await self.notionService.fetchAllSessions() {
                     let workouts = NotionService.groupSessionsByDate(allSessions)
                     await MainActor.run {

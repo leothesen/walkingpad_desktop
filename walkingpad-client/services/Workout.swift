@@ -1,6 +1,7 @@
 import SwiftUI
 import Foundation
 import UserNotifications
+import WidgetKit
 
 /// Snapshot of the current workout counters, used for MQTT publishing.
 struct WorkoutState {
@@ -82,6 +83,14 @@ class Workout: ObservableObject {
     /// When the daily totals last reached disk. Saving only on speed changes means a
     /// steady hour-long walk never triggers one, so this bounds the exposure.
     private var lastSaveTime: Date = .distantPast
+
+    /// Daily totals last fetched from Notion, kept so local saves (workouts.json only
+    /// holds unsynced days) don't wipe the widget's history.
+    private var widgetHistory: [WorkoutSaveData] = []
+
+    /// Pending widget reload, coalescing the once-a-minute saves while walking.
+    private var widgetReload: DispatchWorkItem? = nil
+    private var lastWidgetReload: Date = .distantPast
 
     /// Longest a session may run without the daily totals being written.
     private let maxSaveInterval: TimeInterval = 60
@@ -450,36 +459,63 @@ class Workout: ObservableObject {
         return WorkoutState(steps: self.steps, distance: self.distance, walkingSeconds: self.walkingSeconds)
     }
 
-    /// Computes the last 7 days of walking data and writes it to the shared App Group
-    /// UserDefaults so the widget extension can display it.
-    /// - Parameter workouts: Workout data to use. Falls back to local workouts.json if nil.
+    /// Writes recent daily totals and the goal for the widget extension, then asks
+    /// WidgetKit to redraw.
+    /// - Parameter workouts: Daily totals from Notion. When nil, the last Notion fetch
+    ///   is reused, so a local save never drops older days.
     public func updateWidgetData(from workouts: [WorkoutSaveData]? = nil) {
-        let calendar = Calendar.current
-        let today = calendar.startOfDay(for: Date())
-        let allWorkouts = workouts ?? loadAll()
-        let formatter = DateFormatter()
-        formatter.dateFormat = "yyyy-MM-dd"
-
-        var dailyDistances: [DailyDistance] = []
-        for dayOffset in stride(from: 6, through: 0, by: -1) {
-            let date = calendar.date(byAdding: .day, value: -dayOffset, to: today)!
-            let workout = allWorkouts.first { calendar.isDate($0.date, inSameDayAs: date) }
-            dailyDistances.append(DailyDistance(
-                dateString: formatter.string(from: date),
-                distance: workout?.distance ?? 0,
-                steps: workout?.steps ?? 0
-            ))
+        if let workouts = workouts {
+            widgetHistory = workouts
         }
 
-        let widgetData = WidgetData(
-            weeklyDistances: dailyDistances,
-            totalDistanceMeters: dailyDistances.reduce(0) { $0 + $1.distance },
-            lastUpdated: Date()
+        // Notion history, then unsynced local days, then today's live counters.
+        // Overlapping days keep the larger value per metric: the same walking can be
+        // both in Notion and in the local counters, so adding would double count it.
+        var byDay: [String: WidgetDay] = [:]
+        func merge(date: Date, distance: Int, steps: Int, seconds: Int) {
+            let key = WidgetData.dateString(date)
+            let old = byDay[key]
+            byDay[key] = WidgetDay(
+                dateString: key,
+                distance: max(old?.distance ?? 0, distance),
+                steps: max(old?.steps ?? 0, steps),
+                seconds: max(old?.seconds ?? 0, seconds)
+            )
+        }
+        for day in widgetHistory + loadAll() {
+            merge(date: day.date, distance: day.distance, steps: day.steps, seconds: day.walkingSeconds)
+        }
+        merge(date: Date(), distance: todayDistance, steps: steps, seconds: walkingSeconds)
+
+        let oldest = WidgetData.dateString(
+            Calendar.current.date(byAdding: .day, value: -WidgetData.historyDays, to: Date()) ?? Date()
         )
+        let days = byDay.values
+            .filter { $0.dateString >= oldest }
+            .sorted { $0.dateString < $1.dateString }
+
+        let goal = GoalSettings.shared
+        let widgetGoal = WidgetGoal(kind: WidgetGoal.Kind(rawValue: goal.kind.rawValue) ?? .distance, value: goal.value)
+        let widgetData = WidgetData(days: days, goal: widgetGoal, lastUpdated: Date())
         if let error = widgetData.write() {
             // The widget's container is another app's container — macOS privacy
             // protection can deny the write; surface it instead of going stale silently.
             appLog("Widget data write failed: \(error.localizedDescription)", type: .error)
+            return
         }
+        scheduleWidgetReload()
+    }
+
+    /// Reloads the widget at most once a minute, but always delivers the last change.
+    private func scheduleWidgetReload() {
+        guard widgetReload == nil else { return }
+        let item = DispatchWorkItem { [weak self] in
+            self?.widgetReload = nil
+            self?.lastWidgetReload = Date()
+            WidgetCenter.shared.reloadTimelines(ofKind: "WalkingPadWidget")
+        }
+        widgetReload = item
+        let wait = max(0, 60 - Date().timeIntervalSince(lastWidgetReload))
+        DispatchQueue.main.asyncAfter(deadline: .now() + wait, execute: item)
     }
 }

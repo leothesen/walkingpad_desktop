@@ -55,6 +55,8 @@ Missed days  → NotionService range queries (last 7 days) → StravaService.uns
 | `StatsViewModel.swift` | Computed stats, filtering, trend data |
 | `HttpApi.swift` | Local HTTP server on port 4934 (Embassy) |
 | `MqttService.swift` | MQTT publishing via mqtt-nio |
+| `WidgetData.swift` | Day totals + goal shared with the widget (JSON written into the widget's container) |
+| `WalkingPadWidget/` | Desktop widget: goal ring + day-dot grid, semantic/accentable colors for tinted mode |
 
 ## BLE Protocol
 
@@ -97,3 +99,4 @@ Missed days  → NotionService range queries (last 7 days) → StravaService.uns
 - Missed-day Strava check (`StravaService.checkUnsyncedDays`) re-runs on launch, wake, day rollover, and popover open (throttled to every 10 min) — never cache "yesterday" across midnight
 - Strava API does not support a `steps` field on activity creation — steps only appear in the description text
 - Sparkle EdDSA private key is in GitHub secret `SPARKLE_PRIVATE_KEY`; public key is in Info.plist `SUPublicEDKey`
+- The widget only redraws when told: `Workout.updateWidgetData()` writes the JSON and calls `WidgetCenter.reloadTimelines` (throttled to once a minute). Keep widget colors semantic or `.widgetAccentable()` — hard-coded colors look washed out in tinted desktop mode
