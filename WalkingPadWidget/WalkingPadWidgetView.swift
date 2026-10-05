@@ -1,183 +1,161 @@
 import SwiftUI
 import WidgetKit
 
-/// Main widget view: circular distance ring on the left, weekly bar chart on the right.
+/// Today's goal ring on the left, a grid of day dots filling the rest.
+///
+/// Each dot is one day (columns are weeks, newest on the right). A dot grows and
+/// brightens with the share of the daily goal walked; full size means the goal was met.
+/// Colors are semantic or accentable so the widget follows tinted and clear desktop
+/// styles like the system widgets do.
 struct WalkingPadWidgetView: View {
     let entry: WalkingPadEntry
 
-    private var data: WidgetData? { entry.widgetData }
-
-    private var totalKm: Double {
-        Double(data?.totalDistanceMeters ?? 0) / 1000.0
-    }
-
-    private var distanceText: String {
-        if totalKm >= 100 {
-            return String(format: "%.0f", totalKm)
-        } else if totalKm >= 10 {
-            return String(format: "%.1f", totalKm)
-        } else {
-            return String(format: "%.2f", totalKm)
-        }
-    }
-
     var body: some View {
         Group {
-            if let widgetData = data {
-                mainContent(widgetData)
+            if let data = entry.widgetData {
+                content(data)
             } else {
                 emptyState
             }
         }
-        .containerBackground(for: .widget) {
-            Color.indigo.opacity(0.85)
-        }
+        .containerBackground(.fill.tertiary, for: .widget)
     }
 
-    // MARK: - Main Content
+    private func content(_ data: WidgetData) -> some View {
+        let today = data.day(for: entry.date)
+        let progress = data.goal.progress(of: today)
 
-    private func mainContent(_ widgetData: WidgetData) -> some View {
-        HStack(spacing: 16) {
-            distanceRing
-                .frame(width: 120)
+        return GeometryReader { geo in
+            let spacing: CGFloat = 14
+            let ringSize = geo.size.height
+            let pitch = geo.size.height / 7
+            let dotSize = pitch * 0.86
+            let gridWidth = geo.size.width - ringSize - spacing
+            let weeks = min(WidgetData.historyDays / 7, max(1, Int((gridWidth + pitch - dotSize) / pitch)))
 
-            VStack(alignment: .leading, spacing: 8) {
-                Text("This week")
-                    .font(.caption.weight(.semibold))
-                    .foregroundStyle(.white.opacity(0.8))
-
-                weeklyBarChart(widgetData.weeklyDistances)
-            }
-            .frame(maxWidth: .infinity)
-        }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 12)
-    }
-
-    // MARK: - Distance Ring
-
-    private var distanceRing: some View {
-        ZStack {
-            Circle()
-                .stroke(Color.white.opacity(0.2), lineWidth: 8)
-
-            Circle()
-                .trim(from: 0, to: min(totalKm / 50.0, 1.0))
-                .stroke(
-                    Color.white.opacity(0.5),
-                    style: StrokeStyle(lineWidth: 8, lineCap: .round)
+            HStack(spacing: spacing) {
+                GoalRing(amount: data.goal.amount(of: today), progress: progress, goal: data.goal, size: ringSize)
+                Spacer(minLength: 0)
+                DotGrid(
+                    columns: data.grid(weeks: weeks, today: entry.date),
+                    goal: data.goal,
+                    today: today.dateString,
+                    dotSize: dotSize,
+                    gap: pitch - dotSize
                 )
-                .rotationEffect(.degrees(-90))
-
-            VStack(spacing: 0) {
-                Image(systemName: "figure.walk")
-                    .font(.system(size: 12, weight: .semibold))
-                    .foregroundStyle(.white.opacity(0.7))
-                    .offset(y: -2)
-
-                Text(distanceText)
-                    .font(.system(size: 28, weight: .bold, design: .rounded).monospacedDigit())
-                    .foregroundStyle(.white)
-                    .minimumScaleFactor(0.6)
-                    .lineLimit(1)
-
-                Text("km")
-                    .font(.caption.weight(.medium))
-                    .foregroundStyle(.white.opacity(0.7))
             }
         }
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("Today \(data.goal.format(data.goal.amount(of: today))) of \(data.goal.formattedValue) \(data.goal.unit)")
     }
-
-    // MARK: - Weekly Bar Chart
-
-    private func weeklyBarChart(_ distances: [DailyDistance]) -> some View {
-        let maxDistance = distances.map(\.distance).max() ?? 1
-
-        return VStack(spacing: 4) {
-            GeometryReader { geo in
-                HStack(alignment: .bottom, spacing: 4) {
-                    ForEach(0..<distances.count, id: \.self) { index in
-                        barView(
-                            distance: distances[index].distance,
-                            maxDistance: maxDistance,
-                            height: geo.size.height
-                        )
-                        .frame(maxWidth: .infinity)
-                    }
-                }
-            }
-            .frame(height: 60)
-
-            dayLabelsRow(distances)
-        }
-    }
-
-    private func barView(distance: Int, maxDistance: Int, height: CGFloat) -> some View {
-        VStack {
-            Spacer(minLength: 0)
-            if distance > 0 {
-                RoundedRectangle(cornerRadius: 3)
-                    .fill(Color.white.opacity(0.7))
-                    .frame(height: max(CGFloat(distance) / CGFloat(maxDistance) * height, 4))
-            } else {
-                Rectangle()
-                    .fill(Color.white.opacity(0.15))
-                    .frame(height: 2)
-                    .padding(.horizontal, 2)
-            }
-        }
-    }
-
-    private func dayLabelsRow(_ distances: [DailyDistance]) -> some View {
-        let calendar = Calendar.current
-        let daySymbols = calendar.veryShortWeekdaySymbols
-        let mondayFirst = Array(daySymbols[1...]) + [daySymbols[0]]
-
-        return HStack(spacing: 4) {
-            ForEach(0..<distances.count, id: \.self) { index in
-                let weekdayIndex = dayOfWeekIndex(from: distances[index].dateString)
-                let today = isDateToday(distances[index].dateString)
-                let label = weekdayIndex != nil ? mondayFirst[weekdayIndex!] : "?"
-
-                Text(label)
-                    .font(.system(size: 9, weight: today ? .bold : .regular))
-                    .foregroundStyle(.white.opacity(today ? 0.9 : 0.5))
-                    .frame(maxWidth: .infinity)
-            }
-        }
-    }
-
-    // MARK: - Empty State
 
     private var emptyState: some View {
-        VStack(spacing: 8) {
+        VStack(spacing: 6) {
             Image(systemName: "figure.walk")
                 .font(.title2)
-                .foregroundStyle(.white.opacity(0.5))
-            Text("No data yet")
-                .font(.caption)
-                .foregroundStyle(.white.opacity(0.5))
+                .foregroundStyle(.secondary)
+            Text("No walks yet")
+                .font(.headline)
             Text("Open WalkingPad to sync")
-                .font(.caption2)
-                .foregroundStyle(.white.opacity(0.3))
+                .font(.caption)
+                .foregroundStyle(.secondary)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
+}
 
-    // MARK: - Helpers
+/// Today's amount inside a ring that fills toward the daily goal.
+private struct GoalRing: View {
+    let amount: Double
+    let progress: Double
+    let goal: WidgetGoal
+    let size: CGFloat
 
-    private func dayOfWeekIndex(from dateString: String) -> Int? {
-        let formatter = DateFormatter()
-        formatter.dateFormat = "yyyy-MM-dd"
-        guard let date = formatter.date(from: dateString) else { return nil }
-        let weekday = Calendar.current.component(.weekday, from: date)
-        return (weekday + 5) % 7
+    var body: some View {
+        let line = size * 0.09
+
+        ZStack {
+            Circle()
+                .stroke(.quaternary, lineWidth: line)
+            Circle()
+                .trim(from: 0, to: min(progress, 1))
+                .stroke(Color.green, style: StrokeStyle(lineWidth: line, lineCap: .round))
+                .rotationEffect(.degrees(-90))
+                .widgetAccentable()
+            VStack(spacing: 0) {
+                Text(goal.format(amount))
+                    .font(.system(size: size * 0.21, weight: .bold, design: .rounded))
+                    .monospacedDigit()
+                Text("of \(goal.formattedValue) \(goal.unit)")
+                    .font(.system(size: size * 0.09, weight: .medium))
+                    .foregroundStyle(.secondary)
+            }
+            .lineLimit(1)
+            .minimumScaleFactor(0.5)
+            .padding(.horizontal, line * 1.5)
+        }
+        .padding(line / 2)
+        .frame(width: size, height: size)
     }
+}
 
-    private func isDateToday(_ dateString: String) -> Bool {
-        let formatter = DateFormatter()
-        formatter.dateFormat = "yyyy-MM-dd"
-        guard let date = formatter.date(from: dateString) else { return false }
-        return Calendar.current.isDateInToday(date)
+/// Weeks as columns, oldest first; nil days (later this week) are drawn as outlines.
+private struct DotGrid: View {
+    let columns: [[WidgetDay?]]
+    let goal: WidgetGoal
+    let today: String
+    let dotSize: CGFloat
+    let gap: CGFloat
+
+    var body: some View {
+        HStack(spacing: gap) {
+            ForEach(columns.indices, id: \.self) { week in
+                VStack(spacing: gap) {
+                    ForEach(0..<7, id: \.self) { row in
+                        let day = columns[week][row]
+                        DayDot(
+                            progress: day.map { goal.progress(of: $0) },
+                            isToday: day?.dateString == today,
+                            size: dotSize
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+private struct DayDot: View {
+    /// nil for a day that hasn't happened yet.
+    let progress: Double?
+    let isToday: Bool
+    let size: CGFloat
+
+    var body: some View {
+        ZStack {
+            if let progress = progress {
+                if progress > 0 {
+                    let fraction = min(progress, 1)
+                    Circle()
+                        .fill(Color.green.opacity(0.45 + 0.55 * fraction))
+                        .frame(width: size * (0.32 + 0.68 * fraction), height: size * (0.32 + 0.68 * fraction))
+                        .widgetAccentable()
+                } else {
+                    Circle()
+                        .fill(.quaternary)
+                        .frame(width: max(3, size * 0.2), height: max(3, size * 0.2))
+                }
+            } else {
+                Circle()
+                    .strokeBorder(.quaternary, lineWidth: 1)
+            }
+
+            if isToday {
+                Circle()
+                    .strokeBorder(.primary, lineWidth: 1.3)
+                    .padding(-1.5)
+            }
+        }
+        .frame(width: size, height: size)
     }
 }

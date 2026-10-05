@@ -1,13 +1,13 @@
 import WidgetKit
 import SwiftUI
 
-/// Timeline entry containing the weekly walking data snapshot.
+/// Timeline entry containing the walking data snapshot.
 struct WalkingPadEntry: TimelineEntry {
     let date: Date
     let widgetData: WidgetData?
 }
 
-/// Provides timeline entries by reading from the shared App Group UserDefaults.
+/// Provides timeline entries from the JSON file the main app writes into the widget's container.
 struct WalkingPadWidgetProvider: TimelineProvider {
     func placeholder(in context: Context) -> WalkingPadEntry {
         WalkingPadEntry(date: Date(), widgetData: Self.sampleData())
@@ -20,32 +20,37 @@ struct WalkingPadWidgetProvider: TimelineProvider {
 
     func getTimeline(in context: Context, completion: @escaping (Timeline<WalkingPadEntry>) -> ()) {
         let data = WidgetData.read()
-        let entry = WalkingPadEntry(date: Date(), widgetData: data)
-        // Refresh every 30 minutes; the main app writes fresh data to shared UserDefaults on every save.
-        let nextUpdate = Calendar.current.date(byAdding: .minute, value: 30, to: Date())!
-        completion(Timeline(entries: [entry], policy: .after(nextUpdate)))
+        let now = Date()
+        var entries = [WalkingPadEntry(date: now, widgetData: data)]
+        // Move the grid on to a new day at midnight, even if the app hasn't written since.
+        if let midnight = Calendar.current.date(byAdding: .day, value: 1, to: Calendar.current.startOfDay(for: now)) {
+            entries.append(WalkingPadEntry(date: midnight, widgetData: data))
+        }
+        // The app reloads the widget whenever it writes new data; this is a fallback.
+        let nextUpdate = Calendar.current.date(byAdding: .minute, value: 30, to: now)!
+        completion(Timeline(entries: entries, policy: .after(nextUpdate)))
     }
 
     /// Sample data used for widget gallery previews and placeholders.
     static func sampleData() -> WidgetData {
-        let formatter = DateFormatter()
-        formatter.dateFormat = "yyyy-MM-dd"
         let calendar = Calendar.current
         let today = calendar.startOfDay(for: Date())
-        let sampleDistances = [4200, 5100, 3800, 2600, 0, 0, 0]
-
-        let distances = (0..<7).map { i in
-            let date = calendar.date(byAdding: .day, value: -(6 - i), to: today)!
-            return DailyDistance(
-                dateString: formatter.string(from: date),
-                distance: sampleDistances[i],
-                steps: sampleDistances[i] * 13 / 10
+        // Fixed pattern so the gallery preview looks the same every time.
+        let pattern = [6.2, 7.9, 0, 8.4, 5.1, 0, 0, 4.4, 9.0, 6.7, 0, 3.2, 2.1, 0, 7.5, 8.8, 5.6, 8.1, 4.0, 0, 0]
+        let days = (0..<63).map { offset -> WidgetDay in
+            let date = calendar.date(byAdding: .day, value: -offset, to: today)!
+            let km = offset == 0 ? 3.4 : pattern[offset % pattern.count]
+            return WidgetDay(
+                dateString: WidgetData.dateString(date),
+                distance: Int(km * 1000),
+                steps: Int(km * 1300),
+                seconds: Int(km * 900)
             )
-        }
+        }.reversed()
 
         return WidgetData(
-            weeklyDistances: distances,
-            totalDistanceMeters: distances.reduce(0) { $0 + $1.distance },
+            days: Array(days),
+            goal: WidgetGoal(kind: .distance, value: 8),
             lastUpdated: Date()
         )
     }
@@ -60,8 +65,8 @@ struct WalkingPadWidget: Widget {
         StaticConfiguration(kind: kind, provider: WalkingPadWidgetProvider()) { entry in
             WalkingPadWidgetView(entry: entry)
         }
-        .configurationDisplayName("Walking Distance")
-        .description("Weekly walking distance from your WalkingPad.")
+        .configurationDisplayName("Walking")
+        .description("Today's progress toward your goal, and every day of the last two months.")
         .supportedFamilies([.systemMedium])
     }
 }
