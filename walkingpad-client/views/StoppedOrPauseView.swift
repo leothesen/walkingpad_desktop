@@ -10,34 +10,33 @@ final class TreadmillStarter: ObservableObject {
     @Published private(set) var timedOut = false
     private var attempt = 0
 
+    /// Speed (tenths of km/h) to bring the belt to once it reports movement. Cleared
+    /// when the belt reports it, when the user picks a speed or stops, or on timeout.
+    private var pendingSpeed: UInt8? = nil
+    private var pendingSpeedDeadline: Date = .distantPast
+    private var lastSpeedCommand: Date = .distantPast
+
     /// Sends wake+start, then polls more eagerly than the regular 5 s timer so the
-    /// UI flips to the walking state as soon as the belt reports movement. Once the
-    /// belt runs, it's brought to `speedKmh`. Gives up after 15 s.
+    /// UI flips to the walking state as soon as the belt reports movement. The
+    /// speed is set from the status frames (`statusReceived`), not on a timer: the
+    /// treadmill counts down before the belt moves, so a fixed delay can miss it.
+    /// Gives up after 15 s.
     func start(service: WalkingPadService, speedKmh: Double) {
         isStarting = true
         timedOut = false
         attempt += 1
         let current = attempt
-        let target = UInt8((speedKmh * 10).rounded())
+        pendingSpeed = UInt8((speedKmh * 10).rounded())
+        pendingSpeedDeadline = Date().addingTimeInterval(25)
+        lastSpeedCommand = .distantPast
 
         service.command()?.wakeAndStart()
 
-        // wakeAndStart waits 1.5 s before starting the belt; poll shortly after that.
-        for delay in [2.0, 3.0, 4.5, 6.5] {
+        // wakeAndStart waits 1.5 s before starting the belt; poll through the countdown.
+        for delay in [2.0, 3.0, 4.0, 5.0, 6.0, 7.5, 9.0, 11.0] {
             DispatchQueue.main.asyncAfter(deadline: .now() + delay) {
-                guard self.isStarting, self.attempt == current else { return }
+                guard self.attempt == current, self.isStarting || self.pendingSpeed != nil else { return }
                 service.command()?.updateStatus()
-            }
-        }
-
-        // The belt starts at the treadmill's own default speed; bring it to the chosen one.
-        for delay in [3.5, 6.0] {
-            DispatchQueue.main.asyncAfter(deadline: .now() + delay) {
-                guard self.attempt == current, let speed = service.lastStatus()?.speed, speed > 0 else { return }
-                if speed != Int(target) {
-                    service.command()?.setSpeed(speed: target)
-                }
-                self.isStarting = false
             }
         }
 
@@ -45,7 +44,35 @@ final class TreadmillStarter: ObservableObject {
             guard self.isStarting, self.attempt == current else { return }
             self.isStarting = false
             self.timedOut = true
+            self.pendingSpeed = nil
         }
+    }
+
+    /// Called for every live status frame. Once the belt is moving, asks for the
+    /// chosen speed and keeps asking (at most every 1.5 s) until the belt reports it.
+    func statusReceived(_ state: DeviceState, service: WalkingPadService) {
+        guard let target = pendingSpeed, state.speed > 0 else { return }
+        if Date() > pendingSpeedDeadline {
+            appLog("Start speed: gave up waiting for \(Double(target) / 10) km/h (belt at \(state.speedKmh()))", type: .error)
+            pendingSpeed = nil
+            return
+        }
+        if state.speed == Int(target) {
+            appLog("Start speed: belt at \(state.speedKmh()) km/h")
+            pendingSpeed = nil
+            return
+        }
+        // The belt answers each command with a status frame, so without this
+        // throttle every reply would trigger another command.
+        guard Date().timeIntervalSince(lastSpeedCommand) >= 1.5 else { return }
+        lastSpeedCommand = Date()
+        appLog("Start speed: belt at \(state.speedKmh()) km/h, setting \(Double(target) / 10)")
+        service.command()?.setSpeed(speed: target)
+    }
+
+    /// The user chose a speed or stopped; don't override them with the start speed.
+    func cancelPendingSpeed() {
+        pendingSpeed = nil
     }
 
     /// The belt is running; the start attempt is over.

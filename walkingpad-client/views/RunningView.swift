@@ -233,6 +233,7 @@ struct WalkingView: View {
     /// Sends the stop command and polls eagerly so the belt's speed 0 is seen
     /// quickly. The session ends once the belt confirms (see SessionTracker).
     private func stopTreadmill() {
+        TreadmillStarter.shared.cancelPendingSpeed()
         workout.requestStop()
         walkingPadService.command()?.setSpeed(speed: 0)
         for delay in [1.0, 2.5, 4.0, 6.0] {
@@ -252,6 +253,7 @@ struct WalkingView: View {
     }
 
     private func setSpeed(_ kmh: Double) {
+        TreadmillStarter.shared.cancelPendingSpeed()
         let clamped = min(max(kmh, SpeedPresets.minKmh), SpeedPresets.maxKmh)
         // Round to nearest 0.1 to avoid floating point drift
         targetSpeed = (clamped * 10).rounded() / 10
