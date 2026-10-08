@@ -44,7 +44,7 @@ Missed days  → NotionService range queries (last 7 days) → StravaService.uns
 | `WalkingPadService.swift` | BLE notification parsing, debug log buffer |
 | `WalkingPadCommand.swift` | BLE write commands with checksum |
 | `BluetoothDiscoveryService.swift` | Device scanning, connection, reconnect |
-| `Workout.swift` | Step accumulation, session lifecycle via `SessionTracker`, 60-min notification |
+| `Workout.swift` | Step accumulation, session lifecycle via `SessionTracker`, 60-min and goal-reached notifications |
 | `SessionTracker.swift` | Pure, time-based session state machine (walking / paused / stopping); no UI deps |
 | `GoalSettings.swift` | Daily goal (distance / steps / time) in UserDefaults |
 | `StatusBarIcon.swift` | Menu bar goal ring glyph (template image) |
@@ -94,6 +94,7 @@ Missed days  → NotionService range queries (last 7 days) → StravaService.uns
 - CI and release run on GitHub's `macos-26` runner with Xcode 26.6, so Liquid Glass APIs (`.glassEffect`, `.buttonStyle(.glass/.glassProminent)`) are available; deployment target is macOS 26
 - Picker binding to `@Published` property causes "Publishing changes from within view updates" — use local `@State` for Picker, sync to view model via `DispatchQueue.main.async` in `.onChange`
 - All logging uses `appLog()` (global function in ActivityLog.swift) which routes to both console and the debug panel's Log tab
+- The start speed is applied from status frames (`TreadmillStarter.statusReceived`), not timers: the belt counts down before moving, so wait for the first frame with speed > 0, then resend (throttled) until the belt reports the chosen speed. A manual speed change or Stop cancels it
 - Never count BLE frames as a proxy for time: the treadmill replies to most commands with an extra status frame, so frame bursts arrive after speed changes. Session rules are wall-clock based (see `SessionTracker`)
 - Use semantic colors (`.primary`, `.secondary`, system `.green`/`.orange`) and glass/materials so the UI follows the system light/dark appearance
 - Missed-day Strava check (`StravaService.checkUnsyncedDays`) re-runs on launch, wake, day rollover, and popover open (throttled to every 10 min) — never cache "yesterday" across midnight

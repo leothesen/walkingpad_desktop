@@ -143,6 +143,35 @@ class Workout: ObservableObject {
         onSpeedNudge?(15)
     }
 
+    /// Today's progress towards the daily goal, as the popover shows it.
+    private func goalProgress() -> Double {
+        GoalSettings.shared.progress(distanceMeters: todayDistance, steps: steps, seconds: walkingSeconds)
+    }
+
+    /// Celebrates crossing the daily goal mid-walk. Fires once per day per goal, so
+    /// a relaunch or a late Notion total doesn't repeat it. The belt is left alone.
+    private func sendGoalReachedNotificationIfNeeded() {
+        let goal = GoalSettings.shared
+        let key = "\(WidgetData.dateString(Date()))|\(goal.label)"
+        guard UserDefaults.standard.string(forKey: Self.goalNotifiedKey) != key else { return }
+        UserDefaults.standard.set(key, forKey: Self.goalNotifiedKey)
+
+        // The session in progress isn't in todaySessions until it ends.
+        let walks = todaySessions.count + 1
+        let content = UNMutableNotificationContent()
+        content.title = "Goal reached 🎉"
+        content.body = "\(goal.label) today (\(compactDuration(TimeInterval(walkingSeconds))), \(walks) walk\(walks == 1 ? "" : "s"))"
+        // Notification sounds must ship in the app bundle, so play a system sound instead.
+        content.sound = nil
+
+        let request = UNNotificationRequest(identifier: "walkingpad.goal.reached", content: content, trigger: nil)
+        UNUserNotificationCenter.current().add(request)
+        NSSound(named: "Hero")?.play()
+        appLog("Goal reached notification sent (\(goal.label))")
+    }
+
+    private static let goalNotifiedKey = "goal.notifiedDay"
+
     /// Zeroes daily counters if the date has changed since the last update.
     /// A session still running across midnight is closed first so it isn't lost.
     public func resetIfDateChanged() {
@@ -205,12 +234,18 @@ class Workout: ObservableObject {
             sendWalkingDurationNotificationIfNeeded()
         }
 
+        let walking = tracker.isActive
+
         // Defer @Published mutations to avoid SwiftUI re-entrancy warnings
         DispatchQueue.main.async {
+            let before = self.goalProgress()
             self.steps = self.steps + stepDiff
             self.distance = self.distance + distanceDiff
             self.walkingSeconds = self.walkingSeconds + max(0, walkingTimeDiff)
             self.lastUpdateTime = newState.time
+            if walking && before < 1 && self.goalProgress() >= 1 {
+                self.sendGoalReachedNotificationIfNeeded()
+            }
         }
 
         handle(events)

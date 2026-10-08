@@ -127,6 +127,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         // Central callback chain: every BLE status notification flows through here
         // to update the workout accumulator and publish MQTT state
         self.walkingPadService.callback = { oldState, newState in
+            TreadmillStarter.shared.statusReceived(newState, service: self.walkingPadService)
             self.workout.update(oldState, newState)
             self.mqttService.publish(oldState: oldState, newState: newState, workoutState: self.workout.workoutState())
             // Update status bar after @Published mutations have been dispatched
